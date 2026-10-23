@@ -29,6 +29,7 @@ Everything is read from environment variables; every value has a default, so a b
 | `NOTIFY_URL` / `NOTIFY_FORMAT` | – / guessed | Apprise `…/notify/<key>`, ntfy topic URL or JSON webhook; `apprise`, `ntfy`, `json` |
 | `SEARXNG_URL` | – | The SearXNG that deal hunts search with (JSON format on: `formats: [html, json]`). Each person can set their own under Settings → Deal hunting |
 | `OPENAI_API_KEY` / `OPENAI_MODEL` / `OPENAI_BASE_URL` | – / `gpt-4o-mini` / OpenAI | The owner's own OpenAI-compatible AI for deal hunts (copied once). With Pocket Core, Pocket AI is used instead when the `inference:write` link is on |
+| `DELIVER_TO` | – | The country people start out with under Settings → Deal hunting → Deliver to (ISO code, e.g. `BA`); hunts check every shop delivers there |
 | `DEAL_MARKETS` | – | Where people start out shopping (“Bosnia and Herzegovina, Germany”): the AI searches in those languages |
 | `HUNTS_PER_RUN` | `3` | At most this many “keep hunting” hunts per 15-minute sweep |
 | `FX_PROVIDER` | `auto` | Exchange rates for ranking offers in the home currency: Frankfurter, then open.er-api.com (`none` = off) |
@@ -68,6 +69,7 @@ Prices come from what shops publish for link previews: schema.org `Product` / `O
 2. **Search** — the searches run in parallel on SearXNG; up to 24 pages are kept, at most 3 per shop, never video / social / review sites.
 3. **Read** — every page goes through the same reader as “Add from a link” (6 at a time). Prices written in the search results (“ab 194,99 €”) are kept too.
 4. **Judge** — the AI labels each page exact / variant / used / comparison (accessories and unrelated pages are left out). A price it reports must match the page or the search result within 1 %, or the offer is dropped.
-5. **Rank** — converted to your currency at today's rate; exact matches, in stock, within budget, cheapest first. Dismissed offers stay hidden in later hunts.
+5. **Delivery** — with *Deliver to* set, each shop is checked, strongest evidence first: a shop on that country's domain delivers; the shop's schema.org `shippingDetails` name the countries (and the cost); the product page's shipping sentences; the shop's own shipping / delivery page (cached 30 days per shop) naming the country — in about twenty languages, with "no shipping to …" never read as a yes — or listing eight or more other countries without it (= no). What is still open goes to the AI as evidence; without evidence it stays "not confirmed". Shops that don't deliver are left out (or shown last, Settings). Known shipping costs are added before ranking.
+6. **Rank** — converted to your currency at today's rate; exact matches, in stock, within budget, cheapest first. Dismissed offers stay hidden in later hunts.
 
 The request and the pages found are sent to the AI you chose (Pocket AI = your own Claude account through Pocket Core).

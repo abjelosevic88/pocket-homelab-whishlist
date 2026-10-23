@@ -37,9 +37,10 @@ JSON over HTTP at `/api/v1`. Authenticate with the session cookie (the web app),
 |---|---|---|
 | POST | `/hunt` | `{"query":"Sony WH-1000XM5 black","max_price"|"max_text","condition":"new|any","auto":bool,"list_id","currency"}` → `202` and the new wish; the hunt runs in the background (`hunt_status`: `running` → `done` / `error`, `hunt_step` while it works) |
 | POST | `/wishes/{id}/hunt` | Hunt again, optionally with new terms (same fields) |
-| GET | `/wishes/{id}/offers?dismissed=1` | `{"offers":[{"url","store","title","price","currency","price_home","availability","match","source","note","over_budget"}],"home_currency"}` best first |
+| GET | `/wishes/{id}/offers?dismissed=1` | `{"offers":[{"url","store","title","price","currency","price_home","availability","match","source","note","over_budget","ships":"yes|no|unknown","ship_note","ship_cost","ship_currency"}],"home_currency"}` best first; `price_home` includes known shipping |
 | POST | `/wishes/{id}/offers/{oid}/use` | Make the offer the wish's link and price (and watch it) |
 | POST | `/wishes/{id}/offers/{oid}/dismiss` | `{"dismissed":false}` to bring it back |
+| GET | `/countries` | ISO codes and names for the Deliver to picker |
 | GET | `/ai/status` · `/ai/models` | Which AI judges (`pocket`, `openai`, none) and whether search is set up; your Pocket AI models |
 
 ## Sharing and reservations

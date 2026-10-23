@@ -23,8 +23,8 @@ type huntWorld struct {
 
 func newHuntWorld(t *testing.T) *huntWorld {
 	hw := &huntWorld{priceA: "120.00"}
-	product := func(name, price string) string {
-		return fmt.Sprintf(`<html><head><title>%s</title><script type="application/ld+json">{"@type":"Product","name":%q,"offers":{"@type":"Offer","price":%q,"priceCurrency":"EUR","availability":"https://schema.org/InStock"}}</script></head></html>`, name, name, price)
+	product := func(name, price, extra, body string) string {
+		return fmt.Sprintf(`<html><head><title>%s</title><script type="application/ld+json">{"@type":"Product","name":%q,"offers":{"@type":"Offer","price":%q,"priceCurrency":"EUR","availability":"https://schema.org/InStock"%s}}</script></head><body>%s</body></html>`, name, name, price, extra, body)
 	}
 	hw.shops = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hw.mu.Lock()
@@ -32,11 +32,15 @@ func newHuntWorld(t *testing.T) *huntWorld {
 		hw.mu.Unlock()
 		switch r.URL.Path {
 		case "/a/x100":
-			io.WriteString(w, product("Acme X100 Headphones Black", pa))
+			io.WriteString(w, product("Acme X100 Headphones Black", pa, "", `<a href="/a/versand">Versand und Lieferung</a>`))
+		case "/a/versand":
+			io.WriteString(w, `<html><body><h1>Versand</h1><p>Wir liefern nach Deutschland, Österreich und Bosnien und Herzegowina. Versandkosten 9,90 €.</p></body></html>`)
 		case "/b/case":
-			io.WriteString(w, product("Case for Acme X100", "19.00"))
+			io.WriteString(w, product("Case for Acme X100", "19.00", "", ""))
 		case "/d/x100":
-			io.WriteString(w, product("Acme X100 Headphones", "110.00"))
+			io.WriteString(w, product("Acme X100 Headphones", "110.00", `,"shippingDetails":{"shippingRate":{"value":"4.95","currency":"EUR"},"shippingDestination":{"addressCountry":"DE"}}`, ""))
+		case "/e/x100":
+			io.WriteString(w, product("Acme X100 Headphones", "100.00", "", `<p>Leider ist kein Versand nach Bosnien und Herzegowina möglich.</p>`))
 		default:
 			http.NotFound(w, r)
 		}
@@ -51,6 +55,7 @@ func newHuntWorld(t *testing.T) *huntWorld {
 			{"url": hw.shops.URL + "/b/case", "title": "Case for Acme X100", "content": "Protective case 19,00 €"},
 			{"url": "http://compare.idealo.test/x100", "title": "Acme X100 ab 105,00 € | 30 Angebote", "content": "Preisvergleich"},
 			{"url": hw.shops.URL + "/d/x100", "title": "Acme X100 Shop D", "content": ""},
+			{"url": strings.Replace(hw.shops.URL, "127.0.0.1", "localhost", 1) + "/e/x100", "title": "Acme X100 Shop E", "content": ""},
 			{"url": "https://www.youtube.com/watch?v=1", "title": "Acme X100 review", "content": ""},
 		}
 		json.NewEncoder(w).Encode(map[string]any{"results": res})
@@ -192,10 +197,10 @@ func TestDealHuntKeywordsOnly(t *testing.T) {
 		t.Fatalf("keyword hunt %v %v", w["hunt_status"], w["hunt_summary"])
 	}
 	offers := a.ok(a.alice, "GET", fmt.Sprintf("/api/v1/wishes/%d/offers", id), nil)["offers"].([]any)
-	if len(offers) != 2 { // Shop D (110) and Shop A (120); the case lacks "headphones"
+	if len(offers) != 3 { // Shop E (100), D (110), A (120); the case lacks "headphones"
 		t.Fatalf("keyword offers %v", offers)
 	}
-	if first := offers[0].(map[string]any); num(first, "price") != 11000 {
+	if first := offers[0].(map[string]any); num(first, "price") != 10000 {
 		t.Fatalf("cheapest first: %v", first)
 	}
 	// no search engine: a clear error
@@ -221,5 +226,44 @@ func TestSnippetPrices(t *testing.T) {
 	}
 	if strings.Join(s, " ") != "27999 USD 129900 EUR 19499 EUR 39900 BAM" {
 		t.Fatalf("%v", s)
+	}
+}
+
+// Deliver to Bosnia and Herzegovina: the shipping page of A names it, D's
+// data says Germany only (left out), E says it does not deliver there in a
+// sentence (not confirmed, never "yes"). The best deal is the one that delivers.
+func TestDeliveryCheck(t *testing.T) {
+	hw := newHuntWorld(t)
+	a := newApp(t, nil)
+	a.ok(a.alice, "PUT", "/api/v1/settings", map[string]any{"ai_provider": "openai", "search_url": hw.search.URL, "deliver_to": "BA", "hide_no_ship": true, "home_currency": "EUR"})
+	a.expect(400, a.alice, "PUT", "/api/v1/settings", map[string]any{"deliver_to": "ZZ"})
+	id := num(a.expect(202, a.alice, "POST", "/api/v1/hunt", map[string]any{"query": "Acme X100 Headphones"}), "id")
+	w := a.waitHunt(id)
+	if w["hunt_status"] != "done" || !strings.Contains(w["hunt_summary"].(string), "1 deliver to Bosnia and Herzegovina") || !strings.Contains(w["hunt_summary"].(string), "1 left out") {
+		t.Fatalf("summary %q", w["hunt_summary"])
+	}
+	offers := a.ok(a.alice, "GET", fmt.Sprintf("/api/v1/wishes/%d/offers", id), nil)["offers"].([]any)
+	var got []string
+	for _, o := range offers {
+		m := o.(map[string]any)
+		got = append(got, fmt.Sprintf("%v:%s", m["price"], m["ships"]))
+	}
+	if strings.Join(got, " ") != "10000:unknown 12000:yes" {
+		t.Fatalf("offers %v", got)
+	}
+	if !strings.HasSuffix(w["url"].(string), "/a/x100") {
+		t.Fatalf("best should be the shop that delivers: %v", w["url"])
+	}
+	// with "hide" off, D shows up last as "no"
+	a.ok(a.alice, "PUT", "/api/v1/settings", map[string]any{"hide_no_ship": false})
+	a.expect(202, a.alice, "POST", fmt.Sprintf("/api/v1/wishes/%d/hunt", id), map[string]any{})
+	a.waitHunt(id)
+	offers = a.ok(a.alice, "GET", fmt.Sprintf("/api/v1/wishes/%d/offers", id), nil)["offers"].([]any)
+	last := offers[len(offers)-1].(map[string]any)
+	if last["ships"] != "no" || !strings.Contains(last["ship_note"].(string), "DE") {
+		t.Fatalf("last %v", last)
+	}
+	if c := a.ok(a.alice, "GET", "/api/v1/settings", nil); c["deliver_to_name"] != "Bosnia and Herzegovina" {
+		t.Fatalf("settings %v", c["deliver_to_name"])
 	}
 }

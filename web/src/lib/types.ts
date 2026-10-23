@@ -24,6 +24,7 @@ export interface Settings {
   bought_inventory: boolean; bought_money: boolean
   ai_provider: 'auto' | 'pocket' | 'openai'; ai_pocket_model: string; openai_api_key: string; openai_model: string; openai_base_url: string
   search_url: string; search_default: string; deal_markets: string; deal_abroad: boolean; hunt_every_days: number
+  deliver_to: string; deliver_to_name: string; hide_no_ship: boolean
   max_upload_bytes: number; setup_complete: boolean; base_url: string
 }
 
@@ -55,7 +56,9 @@ export interface Offer {
   id: number; wish_id: number; url: string; store: string; title: string; image: string; price: number; currency: string; price_home: number
   availability: string; match: 'exact' | 'variant' | 'used' | 'comparison' | 'unknown'; source: 'page' | 'snippet'; note: string; over_budget: boolean
   rank: number; dismissed: boolean; found_at: string
+  ships: 'yes' | 'no' | 'unknown'; ship_note: string; ship_cost: number; ship_currency: string
 }
+export interface Country { code: string; name: string }
 export interface AIStatus { ready: boolean; provider: '' | 'pocket' | 'openai'; detail: string; search: boolean }
 export const MATCH: Record<string, string> = { exact: 'Exact match', variant: 'Variant', used: 'Used', comparison: 'Price comparison', unknown: 'Matched by name' }
 

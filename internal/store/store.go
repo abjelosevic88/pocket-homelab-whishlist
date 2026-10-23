@@ -39,6 +39,8 @@ type Store struct {
 	DefaultCurrency string
 	// DefaultMarkets is where a person starts out shopping (DEAL_MARKETS).
 	DefaultMarkets string
+	// DefaultDeliverTo is the country things are delivered to (DELIVER_TO).
+	DefaultDeliverTo string
 }
 
 // Open opens (and creates if needed) the SQLite database and runs migrations.

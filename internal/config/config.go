@@ -73,6 +73,7 @@ type Config struct {
 	OpenAIModel   string
 	OpenAIBaseURL string
 	DealMarkets   string
+	DeliverTo     string // ISO country code
 	HuntsPerRun   int
 	FXProvider    string // auto | frankfurter | erapi | none
 
@@ -184,6 +185,7 @@ func Load() (*Config, error) {
 		OpenAIModel:       env("OPENAI_MODEL", ""),
 		OpenAIBaseURL:     strings.TrimRight(env("OPENAI_BASE_URL", ""), "/"),
 		DealMarkets:       env("DEAL_MARKETS", ""),
+		DeliverTo:         strings.ToUpper(env("DELIVER_TO", "")),
 		HuntsPerRun:       envInt("HUNTS_PER_RUN", 3),
 		FXProvider:        strings.ToLower(env("FX_PROVIDER", "auto")),
 

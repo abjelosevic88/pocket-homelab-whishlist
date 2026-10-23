@@ -63,6 +63,7 @@ func New(cfg *config.Config, st *store.Store, log *slog.Logger, webFS fs.FS) *Se
 		st.DefaultCurrency = cfg.DefaultCurrency
 	}
 	st.DefaultMarkets = cfg.DealMarkets
+	st.DefaultDeliverTo = cfg.DeliverTo
 	return &Server{cfg: cfg, store: st, log: log, webFS: webFS, started: time.Now(), oidc: &oidcProvider{},
 		fetch:    &product.Fetcher{UserAgent: cfg.UserAgent, AllowPrivate: cfg.FetchPrivate},
 		fx:       fx.New(cfg.FXProvider, cfg.UserAgent, 15*time.Second),

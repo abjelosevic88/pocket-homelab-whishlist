@@ -14,6 +14,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/abjelosevic88/pocket-homelab-wishlist/internal/ai"
+	"github.com/abjelosevic88/pocket-homelab-wishlist/internal/countries"
 	"github.com/abjelosevic88/pocket-homelab-wishlist/internal/currency"
 	"github.com/abjelosevic88/pocket-homelab-wishlist/internal/notify"
 	"github.com/abjelosevic88/pocket-homelab-wishlist/internal/pocket"
@@ -52,6 +53,7 @@ func (s *Server) publicSettings(ctx context.Context, u *store.User, st store.Set
 		"ai_provider": st.AIProvider, "ai_pocket_model": st.AIPocketModel, "openai_api_key": mask(st.OpenAIKey), "openai_model": st.OpenAIModel,
 		"openai_base_url": st.OpenAIBaseURL, "search_url": st.SearchURL, "search_default": s.cfg.SearchURL, "deal_markets": st.DealMarkets,
 		"deal_abroad": st.DealAbroad, "hunt_every_days": st.HuntEveryDays,
+		"deliver_to": st.DeliverTo, "deliver_to_name": countries.Name(st.DeliverTo), "hide_no_ship": st.HideNoShip,
 		"max_upload_bytes": s.cfg.MaxUploadBytes, "setup_complete": st.SetupComplete, "base_url": s.cfg.BaseURL,
 	}
 	for _, a := range pocketApps {
@@ -195,6 +197,15 @@ func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 	text("deal_markets", &cur.DealMarkets, in.DealMarkets)
 	boolIn("deal_abroad", &cur.DealAbroad, in.DealAbroad)
 	intIn("hunt_every_days", &cur.HuntEveryDays, in.HuntEveryDays, 1, 60)
+	if keys["deliver_to"] {
+		c := strings.ToUpper(strings.TrimSpace(in.DeliverTo))
+		if c != "" && !countries.Valid(c) {
+			writeErr(w, http.StatusBadRequest, "unknown country")
+			return
+		}
+		cur.DeliverTo = c
+	}
+	boolIn("hide_no_ship", &cur.HideNoShip, in.HideNoShip)
 	boolIn("bought_inventory", &cur.BoughtInventory, in.BoughtInventory)
 	boolIn("bought_money", &cur.BoughtMoney, in.BoughtMoney)
 	mode := func(k string, dst *string, v string) {
@@ -617,4 +628,8 @@ func (s *Server) handleImportJSON(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, counts)
+}
+
+func (s *Server) handleCountries(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, countries.All())
 }

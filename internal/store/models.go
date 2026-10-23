@@ -156,6 +156,10 @@ type Offer struct {
 	Rank         int    `json:"rank"`
 	Dismissed    bool   `json:"dismissed"`
 	FoundAt      string `json:"found_at"`
+	Ships        string `json:"ships"`     // yes | no | unknown (to the person's "deliver to" country)
+	ShipNote     string `json:"ship_note"` // why we think so
+	ShipCost     int64  `json:"ship_cost"` // minor units of ShipCurrency; -1 unknown, 0 free
+	ShipCurrency string `json:"ship_currency"`
 }
 
 // PricePoint is one observed price.
@@ -261,6 +265,8 @@ type Settings struct {
 	DealMarkets   string `json:"deal_markets"`    // "Bosnia and Herzegovina, Germany"
 	DealAbroad    bool   `json:"deal_abroad"`     // shops abroad that ship here count
 	HuntEveryDays int    `json:"hunt_every_days"` // "keep hunting" interval
+	DeliverTo     string `json:"deliver_to"`      // ISO country the things must be delivered to
+	HideNoShip    bool   `json:"hide_no_ship"`    // leave out shops that do not deliver there
 
 	// "Bought it" starts with these switched on.
 	BoughtInventory bool `json:"bought_inventory"`

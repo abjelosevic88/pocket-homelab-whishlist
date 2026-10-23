@@ -452,7 +452,7 @@ export function HuntModal({ wish, lists, listId, onClose, onStarted }: { wish?: 
         </div>
         {!wish && <Field label="Save to">{listOpts.length ? <Select value={String(f.list_id || '')} onChange={v => set('list_id', Number(v))} options={listOpts} /> : <input disabled value="My wishlist (made for you)" />}</Field>}
         <label className="check-row"><Switch checked={f.auto} onChange={v => set('auto', v)} label="Keep hunting" /><span>Keep hunting every {settings?.hunt_every_days || 7} days and tell me when it gets cheaper</span></label>
-        <p className="muted small">Searches shops {settings?.deal_markets ? <>in <b>{settings.deal_markets}</b>{settings.deal_abroad ? ' and abroad when they deliver there' : ''}</> : 'everywhere'} (<Link to="/settings/deals">change</Link>), reads every shop page it finds and keeps only offers for exactly this item, cheapest first in {settings?.home_currency}.</p>
+        <p className="muted small">Searches shops {settings?.deal_markets ? <>in <b>{settings.deal_markets}</b>{settings.deal_abroad ? ' and abroad when they deliver there' : ''}</> : 'everywhere'} (<Link to="/settings/deals">change</Link>), reads every shop page it finds and keeps only offers for exactly this item, cheapest first in {settings?.home_currency}{settings?.deliver_to ? <>, checking each shop delivers to <b>{settings.deliver_to_name}</b></> : ''}.</p>
         <AIStatusLine st={ai} />
         <div className="form-actions"><span className="spacer" /><button type="button" className="btn" onClick={onClose}>Cancel</button><button className="btn primary" disabled={busy || !f.query.trim() || ai?.search === false}><Icon name="sparkles" size={15} />{wish ? 'Hunt again' : 'Find it'}</button></div>
       </form>

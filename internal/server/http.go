@@ -63,6 +63,7 @@ func (s *Server) Router() http.Handler {
 			r.Get("/dashboard", s.handleDashboard)
 			r.Get("/home", s.handleHome)
 			r.Get("/currencies", s.handleCurrencies)
+			r.Get("/countries", s.handleCountries)
 			r.Get("/tags", s.handleTags)
 			r.Get("/occasions", s.handleOccasions)
 			r.Get("/day/{date}", s.handleDay)

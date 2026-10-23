@@ -33,6 +33,21 @@ type Product struct {
 	Price        string `json:"price"` // as written on the page, normalised to "1234.56"
 	Currency     string `json:"currency"`
 	Availability string `json:"availability"` // in_stock | out_of_stock | preorder | ""
+
+	// Delivery: countries the shop's structured data names (ISO codes),
+	// shipping rates per country, sentences of the page about shipping,
+	// and links to the shop's shipping / delivery page.
+	ShipsTo   []string   `json:"ships_to,omitempty"`
+	ShipRates []ShipRate `json:"ship_rates,omitempty"`
+	ShipText  []string   `json:"ship_text,omitempty"`
+	ShipLinks []string   `json:"ship_links,omitempty"`
+}
+
+// ShipRate is what delivery to one country costs ("" country = everywhere).
+type ShipRate struct {
+	Country  string `json:"country"`
+	Price    string `json:"price"`
+	Currency string `json:"currency"`
 }
 
 // ErrBlocked is returned for addresses the fetcher refuses (private networks).
@@ -195,6 +210,7 @@ func Parse(page, pageURL string) *Product {
 		}
 		if n := findProduct(v); n != nil {
 			fromNode(p, n)
+			shippingFrom(p, n)
 			break
 		}
 	}
@@ -254,6 +270,8 @@ func Parse(page, pageURL string) *Product {
 		p.Description = strings.TrimSpace(p.Description[:600]) + "…"
 	}
 	p.Image = absolute(pageURL, p.Image)
+	p.ShipText = shipSentences(page)
+	p.ShipLinks = shipLinks(page, pageURL)
 	if len(p.Currency) != 3 {
 		p.Currency = currencyFromSymbol(p.Currency)
 	}
@@ -527,4 +545,188 @@ func ToMinor(price string, decimals int) int64 {
 		mul *= 10
 	}
 	return int64(f*mul + 0.5)
+}
+
+// ---- delivery ----
+
+// shipWords are what shops write about delivery, in the languages around Europe.
+var shipWords = []string{"ship", "deliver", "delivery", "versand", "liefer", "livraison", "livrons", "spedizion", "consegn", "envío", "envio",
+	"enviamos", "dostav", "isporu", "wysyłk", "dostaw", "verzend", "bezorg", "doprava", "doruč", "szállít", "leverans", "levering", "expedi"}
+
+var (
+	reScriptStyle = regexp.MustCompile(`(?is)<(script|style|noscript|svg)[^>]*>.*?</(script|style|noscript|svg)>`)
+	reAnchor      = regexp.MustCompile(`(?is)<a\s[^>]*href\s*=\s*["']([^"'#]+)["'][^>]*>(.*?)</a>`)
+	reNav         = regexp.MustCompile(`(?is)<nav[^>]*>.*?</nav>`)
+	reSentence    = regexp.MustCompile(`[^.!?\n]{12,260}[.!?\n]?`)
+)
+
+// PlainText is a page's visible text (scripts and styles removed).
+func PlainText(page string) string {
+	page = reScriptStyle.ReplaceAllString(page, " ")
+	page = regexp.MustCompile(`(?i)<br\s*/?>|</(p|div|li|tr|h[1-6])>`).ReplaceAllString(page, "\n")
+	return html.UnescapeString(reTags.ReplaceAllString(page, " "))
+}
+
+func mentionsShipping(s string) bool {
+	low := strings.ToLower(s)
+	for _, w := range shipWords {
+		if strings.Contains(low, w) {
+			return true
+		}
+	}
+	return false
+}
+
+// shipSentences keeps up to eight short sentences of the page about delivery.
+func shipSentences(page string) []string {
+	// menus and links are labels, not statements about delivery
+	page = reNav.ReplaceAllString(page, " ")
+	page = reAnchor.ReplaceAllString(page, " ")
+	text := PlainText(page)
+	if len(text) > 400_000 {
+		text = text[:400_000]
+	}
+	var out []string
+	seen := map[string]bool{}
+	for _, m := range reSentence.FindAllString(text, -1) {
+		m = strings.TrimSpace(reSpace.ReplaceAllString(m, " "))
+		if len(strings.Fields(m)) < 5 || !mentionsShipping(m) || seen[m] {
+			continue
+		}
+		seen[m] = true
+		out = append(out, m)
+		if len(out) == 8 {
+			break
+		}
+	}
+	return out
+}
+
+// shipLinks finds up to three links to the shop's own shipping / delivery page.
+func shipLinks(page, pageURL string) []string {
+	base, err := url.Parse(pageURL)
+	if err != nil {
+		return nil
+	}
+	var out []string
+	seen := map[string]bool{}
+	for _, m := range reAnchor.FindAllStringSubmatch(page, -1) {
+		href, text := html.UnescapeString(m[1]), clean(m[2])
+		probe := strings.ToLower(href + " " + text)
+		if !mentionsShipping(probe) || strings.Contains(probe, "tracking") || strings.Contains(probe, "sendungsverfolgung") {
+			continue
+		}
+		u, err := base.Parse(href)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || StoreName(u.String()) != StoreName(pageURL) {
+			continue
+		}
+		u.Fragment = ""
+		if !seen[u.String()] && u.String() != pageURL {
+			seen[u.String()] = true
+			out = append(out, u.String())
+			if len(out) == 3 {
+				break
+			}
+		}
+	}
+	return out
+}
+
+// countryCode reads a schema.org country: "DE", "Germany" is not mapped (codes only), {"name":"DE"}.
+func countryCodes(v any) []string {
+	var out []string
+	switch t := v.(type) {
+	case string:
+		for _, part := range strings.FieldsFunc(t, func(r rune) bool { return r == ',' || r == ' ' || r == ';' }) {
+			if c := strings.ToUpper(strings.TrimSpace(part)); len(c) == 2 {
+				out = append(out, c)
+			}
+		}
+	case map[string]any:
+		for _, k := range []string{"addressCountry", "name", "identifier", "@id"} {
+			if x, ok := t[k]; ok {
+				if cs := countryCodes(x); len(cs) > 0 {
+					return cs
+				}
+			}
+		}
+	case []any:
+		for _, x := range t {
+			out = append(out, countryCodes(x)...)
+		}
+	}
+	return out
+}
+
+// shippingFrom reads schema.org OfferShippingDetails / eligibleRegion of a product.
+func shippingFrom(p *Product, n map[string]any) {
+	seen := map[string]bool{}
+	addCountry := func(c string) {
+		if !seen[c] {
+			seen[c] = true
+			p.ShipsTo = append(p.ShipsTo, c)
+		}
+	}
+	var walk func(v any, depth int)
+	walk = func(v any, depth int) {
+		if depth > 6 {
+			return
+		}
+		switch t := v.(type) {
+		case []any:
+			for _, x := range t {
+				walk(x, depth+1)
+			}
+		case map[string]any:
+			if sd, ok := t["shippingDetails"]; ok {
+				details := []any{sd}
+				if arr, ok := sd.([]any); ok {
+					details = arr
+				}
+				for _, d := range details {
+					dm, ok := d.(map[string]any)
+					if !ok {
+						continue
+					}
+					cs := countryCodes(dm["shippingDestination"])
+					for _, c := range cs {
+						addCountry(c)
+					}
+					if rate, ok := dm["shippingRate"].(map[string]any); ok {
+						price, cur := NormalizePrice(str(rate["value"])), strings.ToUpper(str(rate["currency"]))
+						if price != "" {
+							if len(cs) == 0 {
+								cs = []string{""}
+							}
+							for _, c := range cs {
+								p.ShipRates = append(p.ShipRates, ShipRate{Country: c, Price: price, Currency: cur})
+							}
+						}
+					}
+				}
+			}
+			for _, k := range []string{"eligibleRegion", "areaServed"} {
+				if r, ok := t[k]; ok {
+					for _, c := range countryCodes(r) {
+						addCountry(c)
+					}
+				}
+			}
+			for _, k := range []string{"offers", "hasVariant"} {
+				if x, ok := t[k]; ok {
+					walk(x, depth+1)
+				}
+			}
+		}
+	}
+	walk(n, 0)
+}
+
+// FetchText downloads a page (a shop's shipping page) and returns its visible text.
+func (f *Fetcher) FetchText(ctx context.Context, raw string) (string, error) {
+	b, _, _, err := f.get(ctx, raw, "text/html,application/xhtml+xml;q=0.9,*/*;q=0.5", 3<<20)
+	if err != nil {
+		return "", err
+	}
+	return strings.Join(strings.Fields(PlainText(string(b))), " "), nil
 }

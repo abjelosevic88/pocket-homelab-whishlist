@@ -9,6 +9,7 @@ import { Icon } from './icons'
 import { useMoney } from './wish'
 import { HuntModal } from './forms'
 import { useLists } from './Layout'
+import { useApp } from '../lib/app-context'
 
 export function DealsCard({ w, onChanged }: { w: Wish; onChanged: () => void }) {
   const money = useMoney()
@@ -17,6 +18,8 @@ export function DealsCard({ w, onChanged }: { w: Wish; onChanged: () => void }) 
   const [offers, setOffers] = useState<Offer[] | null>(null)
   const [home, setHome] = useState('')
   const [hunt, setHunt] = useState(false)
+  const { settings } = useApp()
+  const deliverTo = settings?.deliver_to || ''
   const running = w.hunt_status === 'running'
   const load = () => api.get<{ offers: Offer[]; home_currency: string }>(`${V1}/wishes/${w.id}/offers`).then(r => { setOffers(r.offers); setHome(r.home_currency) }).catch(() => setOffers([]))
   useEffect(() => { load() }, [w.id, w.hunt_at]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -52,13 +55,19 @@ export function DealsCard({ w, onChanged }: { w: Wish; onChanged: () => void }) 
                   {o.availability && <span className={`badge ${o.availability === 'out_of_stock' ? 'danger' : ''}`}>{AVAIL[o.availability]}</span>}
                   {o.over_budget && <span className="badge warn">over budget</span>}
                   {current && <span className="badge accent">your link</span>}
+                  {deliverTo && o.match !== 'comparison' && <span className={`badge ${o.ships === 'yes' ? 'ok' : o.ships === 'no' ? 'danger' : ''}`} title={o.ship_note}>
+                    <Icon name={o.ships === 'yes' ? 'check' : o.ships === 'no' ? 'x' : 'help'} size={11} />{o.ships === 'yes' ? `Delivers to ${deliverTo}` : o.ships === 'no' ? `No delivery to ${deliverTo}` : 'Delivery not confirmed'}
+                  </span>}
                 </div>
                 <div className="offer-title ellipsis" title={o.title}>{o.title}</div>
                 {(o.note || o.source === 'snippet') && <div className="muted small">{o.note || 'Price from the search result — check the page'}</div>}
+                {deliverTo && o.ship_note && o.match !== 'comparison' && <div className="muted small"><Icon name="package" size={11} /> {o.ship_note}</div>}
               </div>
               <div className="offer-price">
                 <b>{money(o.price, o.currency)}</b>
-                {o.currency !== home && o.price_home > 0 && <span className="muted small">≈ {money(o.price_home, home)}</span>}
+                {o.ship_cost === 0 && <span className="muted small">free delivery</span>}
+                {o.ship_cost > 0 && <span className="muted small">+ {money(o.ship_cost, o.ship_currency)} delivery</span>}
+                {(o.currency !== home || o.ship_cost > 0) && o.price_home > 0 && <span className="muted small">≈ {money(o.price_home, home)}{o.ship_cost > 0 ? ' in all' : ''}</span>}
               </div>
               <div className="offer-actions">
                 <a className="btn sm ghost" href={o.url} target="_blank" rel="noreferrer noopener" aria-label={`Open ${o.store}`}><Icon name="external" size={14} /></a>

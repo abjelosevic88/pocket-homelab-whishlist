@@ -1,6 +1,9 @@
 package product
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestParseJSONLD(t *testing.T) {
 	page := `<html><head><title>ignored</title>
@@ -40,5 +43,25 @@ func TestCheckURL(t *testing.T) {
 		if _, err := CheckURL(bad); err == nil {
 			t.Errorf("%q accepted", bad)
 		}
+	}
+}
+
+func TestShipping(t *testing.T) {
+	page := `<html><head><script type="application/ld+json">{"@type":"Product","name":"Lamp","offers":{"@type":"Offer","price":"40","priceCurrency":"EUR",
+"shippingDetails":[{"@type":"OfferShippingDetails","shippingRate":{"value":"4.95","currency":"EUR"},"shippingDestination":{"@type":"DefinedRegion","addressCountry":"DE"}},
+{"@type":"OfferShippingDetails","shippingRate":{"value":9.9,"currency":"EUR"},"shippingDestination":[{"addressCountry":"AT"},{"addressCountry":"CH"}]}]}}</script>
+<script>var x = "versand nach überall";</script></head><body>
+<p>Kostenloser Versand ab 50 € innerhalb Deutschlands.</p><div>Great lamp, bright light.</div>
+<a href="/hilfe/versand-und-lieferung">Versand &amp; Lieferung</a> <a href="https://other.example/shipping">Shipping</a> <a href="/sendungsverfolgung">Sendungsverfolgung</a>
+</body></html>`
+	p := Parse(page, "https://www.lamps.example/p/1")
+	if strings.Join(p.ShipsTo, ",") != "DE,AT,CH" || len(p.ShipRates) != 3 || p.ShipRates[1].Price != "9.9" || p.ShipRates[1].Country != "AT" {
+		t.Fatalf("structured %+v %+v", p.ShipsTo, p.ShipRates)
+	}
+	if len(p.ShipText) != 1 || !strings.Contains(p.ShipText[0], "innerhalb Deutschlands") {
+		t.Fatalf("text %q", p.ShipText)
+	}
+	if len(p.ShipLinks) != 1 || p.ShipLinks[0] != "https://www.lamps.example/hilfe/versand-und-lieferung" {
+		t.Fatalf("links %q", p.ShipLinks)
 	}
 }

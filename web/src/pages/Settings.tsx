@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api, V1 } from '../lib/api'
 import { useApp } from '../lib/app-context'
-import type { APIToken, ConnMode, MoneyAccount, MoneyCategory, Settings as SettingsT, SplitGroup, User } from '../lib/types'
+import type { APIToken, ConnMode, Country, MoneyAccount, MoneyCategory, Settings as SettingsT, SplitGroup, User } from '../lib/types'
 import { DATE_FORMATS, TIME_FORMATS, fmtBytes, fmtDateTime, type DateFormat, type TimeFormat } from '../lib/format'
 import { Avatar, Confirm, CoreHint, Field, Loading, Modal, Segmented, SettingRow, Switch, Tabs, useAsync, useIsMobile, useToast } from '../components/ui'
 import { Icon } from '../components/icons'
@@ -171,6 +171,8 @@ function Deals() {
   const { f, setF, save, busy } = useSettingsForm()
   const { run, status } = useTester()
   const ai = useAIStatus()
+  const [countries, setCountries] = useState<Country[]>([])
+  useEffect(() => { api.get<Country[]>(`${V1}/countries`).then(setCountries).catch(() => {}) }, [])
   if (!f) return <Loading />
   const coreOn = f.core_configured && f.core_registered !== false
   // Pocket AI only comes through Pocket Core: without one a saved "pocket" shows as what is in effect.
@@ -197,7 +199,11 @@ function Deals() {
         </div>
       </Section>
       <Section title="Where you buy" icon="store">
-        <SettingRow title="Countries" help="The AI searches in their languages and leaves out shops that cannot sell there." stack><input value={f.deal_markets} onChange={e => setF({ ...f, deal_markets: e.target.value })} placeholder="Bosnia and Herzegovina, Germany, Croatia" /></SettingRow>
+        <SettingRow title="Deliver to" help="Every hunt checks whether each shop delivers there: the shop's shipping data, its shipping page and what the page says. Known shipping costs are added to the price.">
+          <Select ariaLabel="Deliver to" value={f.deliver_to} onChange={v => setF({ ...f, deliver_to: v })} options={countries.map(c => ({ value: c.code, label: c.name, hint: c.code }))} placeholder="Don't check delivery" clearLabel="Don't check delivery" />
+        </SettingRow>
+        <SettingRow title="Shops that don't deliver" help="Leave them out of the results, or show them last, marked."><Switch checked={f.hide_no_ship} onChange={v => setF({ ...f, hide_no_ship: v })} disabled={!f.deliver_to} label="Leave out shops that don't deliver" /></SettingRow>
+        <SettingRow title="Countries you buy from" help="The AI searches in their languages." stack><input value={f.deal_markets} onChange={e => setF({ ...f, deal_markets: e.target.value })} placeholder="Bosnia and Herzegovina, Germany, Croatia" /></SettingRow>
         <SettingRow title="Shops abroad" help="Online shops in other countries that deliver to you."><Switch checked={f.deal_abroad} onChange={v => setF({ ...f, deal_abroad: v })} label="Include shops abroad that deliver" /></SettingRow>
         <SettingRow title="Keep hunting every" help="For wishes with “keep hunting” on; a clearly cheaper offer sends a push."><span className="row"><input type="number" min={1} max={60} value={f.hunt_every_days} onChange={e => setF({ ...f, hunt_every_days: Number(e.target.value) })} className="set-time" /><span className="muted small">days</span></span></SettingRow>
       </Section>

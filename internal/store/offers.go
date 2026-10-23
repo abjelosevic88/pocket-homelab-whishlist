@@ -5,12 +5,13 @@ import (
 	"time"
 )
 
-const offerCols = `id, wish_id, url, store, title, image, price, currency, price_home, availability, match, source, note, over_budget, rank, dismissed, found_at`
+const offerCols = `id, wish_id, url, store, title, image, price, currency, price_home, availability, match, source, note, over_budget, rank, dismissed, found_at,
+	ships, ship_note, ship_cost, ship_currency`
 
 func scanOffer(row interface{ Scan(...any) error }) (*Offer, error) {
 	var o Offer
 	if err := row.Scan(&o.ID, &o.WishID, &o.URL, &o.Store, &o.Title, &o.Image, &o.Price, &o.Currency, &o.PriceHome, &o.Availability,
-		&o.Match, &o.Source, &o.Note, &o.OverBudget, &o.Rank, &o.Dismissed, &o.FoundAt); err != nil {
+		&o.Match, &o.Source, &o.Note, &o.OverBudget, &o.Rank, &o.Dismissed, &o.FoundAt, &o.Ships, &o.ShipNote, &o.ShipCost, &o.ShipCurrency); err != nil {
 		return nil, notFound(err)
 	}
 	return &o, nil
@@ -85,9 +86,14 @@ func (s *Store) ReplaceOffers(ctx context.Context, uid, wishID int64, offers []O
 		if dismissed[o.URL] {
 			continue
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO offers (wish_id, user_id, url, store, title, image, price, currency, price_home, availability, match, source, note, over_budget, rank)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(wish_id, url) DO NOTHING`,
-			wishID, uid, o.URL, o.Store, o.Title, o.Image, o.Price, o.Currency, o.PriceHome, o.Availability, o.Match, o.Source, o.Note, boolInt(o.OverBudget), i+1); err != nil {
+		if o.Ships == "" {
+			o.Ships = "unknown"
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO offers (wish_id, user_id, url, store, title, image, price, currency, price_home, availability, match, source, note, over_budget, rank,
+			ships, ship_note, ship_cost, ship_currency)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(wish_id, url) DO NOTHING`,
+			wishID, uid, o.URL, o.Store, o.Title, o.Image, o.Price, o.Currency, o.PriceHome, o.Availability, o.Match, o.Source, o.Note, boolInt(o.OverBudget), i+1,
+			o.Ships, o.ShipNote, o.ShipCost, o.ShipCurrency); err != nil {
 			return err
 		}
 	}

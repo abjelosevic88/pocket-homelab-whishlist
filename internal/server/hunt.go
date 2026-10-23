@@ -16,6 +16,7 @@ import (
 
 	core "github.com/abjelosevic88/pocket-homelab-core/sdk"
 	"github.com/abjelosevic88/pocket-homelab-wishlist/internal/ai"
+	"github.com/abjelosevic88/pocket-homelab-wishlist/internal/countries"
 	"github.com/abjelosevic88/pocket-homelab-wishlist/internal/currency"
 	"github.com/abjelosevic88/pocket-homelab-wishlist/internal/notify"
 	"github.com/abjelosevic88/pocket-homelab-wishlist/internal/product"
@@ -60,6 +61,19 @@ type candidate struct {
 	PagePrice int64 // minor units of PageCur
 	PageCur   string
 	Snippets  []amount // prices written in the search result
+	Ship      delivery // does it deliver to the person's country
+}
+
+// delivery is what we know about a shop delivering to the person's country.
+// hard = from the shop's own data or its shipping page (the AI cannot
+// overrule it); evidence is what the AI gets to read.
+type delivery struct {
+	verdict  string // yes | no | unknown
+	note     string
+	hard     bool
+	cost     int64 // minor units of cur; -1 unknown
+	cur      string
+	evidence []string
 }
 
 type amount struct {
@@ -154,6 +168,9 @@ func huntBrief(w *store.Wish, st store.Settings) string {
 		}
 		b.WriteString("\n")
 	}
+	if c := st.DeliverTo; c != "" {
+		fmt.Fprintf(&b, "Deliver to: %s (%s). An offer only helps when the shop delivers there.\n", countries.Name(c), c)
+	}
 	fmt.Fprintf(&b, "Their currency: %s. Today: %s.\n", st.HomeCurrency, time.Now().Format("2006-01-02"))
 	return b.String()
 }
@@ -178,13 +195,14 @@ Write 3 to 6 queries: the product name with its model number, combined with word
 const judgeSystem = `You compare shop offers for one product for a careful shopper. Use only the data given: never invent shops, prices or facts. You answer with one JSON object and nothing else.`
 
 const judgePrompt = `Return JSON:
-{"offers": [{"i": 3, "match": "exact", "price": "299.00", "currency": "EUR", "shop": "Shop name", "in_stock": true, "note": "at most 12 words"}],
+{"offers": [{"i": 3, "match": "exact", "price": "299.00", "currency": "EUR", "shop": "Shop name", "in_stock": true, "ships": "yes", "ship_note": "at most 10 words", "note": "at most 12 words"}],
  "summary": "two or three short sentences for the person: the best deal and why, and what to watch out for"}
 Rules:
 - One entry per candidate that sells the wanted product or a close variant; leave out the rest.
 - match: "exact" = this product as asked (the must-match details fit); "variant" = same product, other colour/size/bundle; "used" = used or refurbished; "comparison" = a price comparison site listing other shops; "accessory" or "unrelated" = not the product (leave those out).
 - price and currency must be one of the prices shown for that candidate (page price first, else a price from its search result). If none is shown, leave the candidate out.
 - in_stock: true, false, or null when unknown.
+- ships: whether the shop delivers to the "Deliver to" country: "yes", "no", or "unknown". Decide only from the delivery and "about shipping" information shown for that candidate (a shop on that country's domain delivers there); without such information say "unknown". ship_note: the reason in a few words, e.g. "ships within the EU only", "page lists Bosnia and Herzegovina".
 - note: what matters for buying there, e.g. "marketplace seller", "price from the search result, check the page", "ships from Germany", "older model".
 - Leave out shops that cannot sell to the person under the rules above.`
 
@@ -254,6 +272,10 @@ func (s *Server) hunt(ctx context.Context, uid, wishID int64) (summary, aiUsed s
 	// 3. read the pages
 	s.store.HuntStep(ctx, w.ID, fmt.Sprintf("Reading %d shop pages", len(cands)))
 	s.readCandidates(ctx, cands)
+	if st.DeliverTo != "" {
+		s.store.HuntStep(ctx, w.ID, "Checking delivery to "+countries.Name(st.DeliverTo))
+		s.checkDelivery(ctx, cands, st.DeliverTo)
+	}
 
 	// 4. judge
 	s.store.HuntStep(ctx, w.ID, "Comparing the offers")
@@ -272,6 +294,18 @@ func (s *Server) hunt(ctx context.Context, uid, wishID int64) (summary, aiUsed s
 
 	// 5. rank in the home currency
 	s.rankOffers(ctx, offers, w, st)
+	hidden := 0
+	if st.HideNoShip && st.DeliverTo != "" {
+		kept := offers[:0]
+		for _, o := range offers {
+			if o.Ships == "no" {
+				hidden++
+				continue
+			}
+			kept = append(kept, o)
+		}
+		offers = kept
+	}
 	if len(offers) > 15 {
 		offers = offers[:15]
 	}
@@ -279,16 +313,25 @@ func (s *Server) hunt(ctx context.Context, uid, wishID int64) (summary, aiUsed s
 		return "", aiUsed, 0, err
 	}
 	saved, _ := s.store.ListOffers(ctx, uid, w.ID, false)
+	// the best deal: cheapest eligible offer that surely delivers, else one not confirmed
 	var bestOffer *store.Offer
-	for i := range saved {
-		o := &saved[i]
-		if (o.Match == "exact" || o.Match == "unknown" || o.Match == "variant") && o.Availability != "out_of_stock" && !o.OverBudget {
-			bestOffer = o
+	for _, want := range []string{"yes", "unknown"} {
+		for i := range saved {
+			o := &saved[i]
+			if (o.Match == "exact" || o.Match == "unknown" || o.Match == "variant") && o.Availability != "out_of_stock" && !o.OverBudget && o.Ships == want {
+				bestOffer = o
+				break
+			}
+		}
+		if bestOffer != nil {
 			break
 		}
 	}
 	if summary == "" {
 		summary = keywordSummary(saved, bestOffer)
+	}
+	if st.DeliverTo != "" {
+		summary += deliverySummary(saved, hidden, st.DeliverTo)
 	}
 	if aiUsed == "" && aiWhy != "" {
 		summary += " Matched by keywords only — " + strings.TrimSuffix(aiWhy, ".") + "."
@@ -458,6 +501,12 @@ func (c *candidate) line(i int) string {
 	} else {
 		b.WriteString(" | page could not be read")
 	}
+	if c.Ship.verdict != "" && c.Ship.verdict != "unknown" {
+		fmt.Fprintf(&b, " | delivery: %s (%s)", c.Ship.verdict, c.Ship.note)
+	}
+	for _, e := range c.Ship.evidence {
+		fmt.Fprintf(&b, " | about shipping: %q", oneLine(e, 300))
+	}
 	fmt.Fprintf(&b, " | search result: %q", oneLine(c.Title+" — "+c.Snippet, 300))
 	if len(c.Snippets) > 0 {
 		var ps []string
@@ -500,6 +549,8 @@ func (s *Server) judge(ctx context.Context, cl *ai.Client, w *store.Wish, st sto
 			Currency string `json:"currency"`
 			Shop     string `json:"shop"`
 			InStock  *bool  `json:"in_stock"`
+			Ships    string `json:"ships"`
+			ShipNote string `json:"ship_note"`
 			Note     string `json:"note"`
 		} `json:"offers"`
 		Summary string `json:"summary"`
@@ -539,6 +590,13 @@ func (s *Server) judge(ctx context.Context, cl *ai.Client, w *store.Wish, st sto
 			of.Availability = map[bool]string{true: "in_stock", false: "out_of_stock"}[*o.InStock]
 		}
 		of.Note = oneLine(o.Note, 140)
+		// the AI may settle delivery only from shipping information it was shown
+		if !c.Ship.hard && len(c.Ship.evidence) > 0 {
+			switch v := strings.ToLower(strings.TrimSpace(o.Ships)); v {
+			case "yes", "no":
+				of.Ships, of.ShipNote = v, oneLine(firstNonEmpty(o.ShipNote, "from the shop's shipping information"), 120)
+			}
+		}
 		offers = append(offers, of)
 	}
 	return offers, oneLine(out.Summary, 600), nil
@@ -573,8 +631,13 @@ func offerFrom(c *candidate, minor int64, cur, src string) store.Offer {
 		}
 	}
 	o.Title = oneLine(o.Title, 200)
+	o.Ships, o.ShipNote, o.ShipCost, o.ShipCurrency = firstNonEmpty(c.Ship.verdict, "unknown"), c.Ship.note, -1, ""
+	if c.Ship.cost >= 0 && c.Ship.cur != "" {
+		o.ShipCost, o.ShipCurrency = c.Ship.cost, c.Ship.cur
+	}
 	if hasAny(c.Domain, comparisonDomains) {
 		o.Match = "comparison"
+		o.Ships, o.ShipNote = "unknown", "a price comparison site: check the shop you pick"
 	}
 	return o
 }
@@ -645,11 +708,20 @@ func (s *Server) rankOffers(ctx context.Context, offers []store.Offer, w *store.
 	for i := range offers {
 		o := &offers[i]
 		o.PriceHome = s.convert(ctx, o.Price, o.Currency, home)
+		if o.PriceHome > 0 && o.ShipCost > 0 {
+			// compare what it costs delivered
+			if c := s.convert(ctx, o.ShipCost, o.ShipCurrency, home); c > 0 {
+				o.PriceHome += c
+			}
+		}
 		o.OverBudget = maxHome > 0 && o.PriceHome > maxHome
 	}
 	order := map[string]int{"exact": 0, "unknown": 1, "variant": 2, "comparison": 3, "used": 4}
 	sort.SliceStable(offers, func(i, j int) bool {
 		a, b := offers[i], offers[j]
+		if (a.Ships == "no") != (b.Ships == "no") {
+			return b.Ships == "no"
+		}
 		if order[a.Match] != order[b.Match] {
 			return order[a.Match] < order[b.Match]
 		}
@@ -986,3 +1058,201 @@ func (s *Server) handleAIModels(w http.ResponseWriter, r *http.Request) {
 func validAIProvider(v string) bool { return core.ValidAIProvider(v) }
 
 func validPocketModel(v string) bool { return core.ValidInferenceModel(v) }
+
+// ---- delivery to the person's country ----
+
+// checkDelivery decides, without AI, what it can: a shop on the country's
+// domain delivers there; the shop's structured shipping data names countries;
+// the shop's own shipping page names the country (or lists many others).
+// What stays open goes to the AI as evidence.
+func (s *Server) checkDelivery(ctx context.Context, cands []*candidate, code string) {
+	name := countries.Name(code)
+	tld := countries.TLD(code)
+	var open []*candidate
+	for _, c := range cands {
+		c.Ship = delivery{verdict: "unknown", cost: -1}
+		host := strings.ToLower(c.Domain)
+		switch {
+		case strings.HasSuffix(host, tld):
+			c.Ship.verdict, c.Ship.hard, c.Ship.note = "yes", true, "shop in "+name
+		case c.Page != nil && len(c.Page.ShipsTo) > 0:
+			c.Ship.hard = true
+			if contains(c.Page.ShipsTo, code) {
+				c.Ship.verdict, c.Ship.note = "yes", "the shop's data lists "+name
+			} else {
+				c.Ship.verdict, c.Ship.note = "no", "delivers only to "+strings.Join(c.Page.ShipsTo[:min(6, len(c.Page.ShipsTo))], ", ")
+			}
+		}
+		if c.Page != nil {
+			for _, r := range c.Page.ShipRates {
+				if (r.Country == code || r.Country == "") && currency.Valid(r.Currency) {
+					c.Ship.cost, c.Ship.cur = product.ToMinor(r.Price, currency.Decimals(r.Currency)), r.Currency
+					if r.Price == "0" || r.Price == "0.00" {
+						c.Ship.cost = 0
+					}
+					if r.Country == code {
+						break
+					}
+				}
+			}
+			for _, t := range c.Page.ShipText {
+				if found, around := countries.Find(t, code); found != "" && !c.Ship.hard {
+					if negated(around) {
+						c.Ship.evidence = append(c.Ship.evidence, around) // "no shipping to …": the AI decides
+						continue
+					}
+					c.Ship.verdict, c.Ship.note = "yes", "the page mentions "+found
+					c.Ship.evidence = append(c.Ship.evidence, around)
+				}
+			}
+			if len(c.Ship.evidence) == 0 && len(c.Page.ShipText) > 0 {
+				c.Ship.evidence = append(c.Ship.evidence, strings.Join(c.Page.ShipText[:min(3, len(c.Page.ShipText))], " / "))
+			}
+		}
+		if !c.Ship.hard && c.Page != nil && len(c.Page.ShipLinks) > 0 && (c.PagePrice > 0 || len(c.Snippets) > 0) {
+			open = append(open, c)
+		}
+	}
+	// the shop's shipping page: one per shop, at most 10 shops, cached 30 days
+	byShop := map[string][]*candidate{}
+	var shops []string
+	for _, c := range open {
+		if _, ok := byShop[c.Domain]; !ok {
+			shops = append(shops, c.Domain)
+		}
+		byShop[c.Domain] = append(byShop[c.Domain], c)
+	}
+	if len(shops) > 10 {
+		shops = shops[:10]
+	}
+	sem := make(chan struct{}, 4)
+	var wg sync.WaitGroup
+	for _, shop := range shops {
+		wg.Add(1)
+		go func(shop string) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			d := s.shopDelivery(ctx, shop, byShop[shop][0].Page.ShipLinks, code)
+			for _, c := range byShop[shop] {
+				if d.verdict != "unknown" {
+					c.Ship.verdict, c.Ship.note, c.Ship.hard = d.verdict, d.note, true
+				}
+				c.Ship.evidence = append(c.Ship.evidence, d.evidence...)
+			}
+		}(shop)
+	}
+	wg.Wait()
+}
+
+func contains(list []string, x string) bool {
+	for _, v := range list {
+		if v == x {
+			return true
+		}
+	}
+	return false
+}
+
+type shopShipping struct {
+	Verdict  string   `json:"verdict"`
+	Note     string   `json:"note"`
+	Evidence []string `json:"evidence"`
+}
+
+// shopDelivery reads a shop's shipping page for the country (cached 30 days per shop and country).
+func (s *Server) shopDelivery(ctx context.Context, shop string, links []string, code string) delivery {
+	key := "ship:" + shop + ":" + code
+	if v, at, ok := s.store.CacheGet(ctx, key); ok {
+		if t, err := time.Parse(time.RFC3339Nano, at); err == nil && time.Since(t) < 30*24*time.Hour {
+			var c shopShipping
+			if json.Unmarshal([]byte(v), &c) == nil {
+				return delivery{verdict: c.Verdict, note: c.Note, evidence: c.Evidence, cost: -1}
+			}
+		}
+	}
+	name := countries.Name(code)
+	out := shopShipping{Verdict: "unknown"}
+	for _, link := range links[:min(2, len(links))] {
+		pctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+		text, err := s.fetch.FetchText(pctx, link)
+		cancel()
+		if err != nil || text == "" {
+			continue
+		}
+		if found, around := countries.Find(text, code); found != "" {
+			if negated(around) {
+				out = shopShipping{Verdict: "unknown", Evidence: []string{"shipping page: " + around}}
+				break
+			}
+			out = shopShipping{Verdict: "yes", Note: "the shop's shipping page names " + found, Evidence: []string{around}}
+			break
+		}
+		if n := countries.CountIn(text, code); n >= 8 {
+			out = shopShipping{Verdict: "no", Note: fmt.Sprintf("the shipping page lists %d countries, not %s", n, name)}
+			break
+		}
+		// neither: keep what it says about shipping for the AI
+		var said []string
+		for _, sent := range strings.Split(text, ". ") {
+			if mentionsShip(sent) {
+				said = append(said, oneLine(sent, 200))
+				if len(said) == 3 {
+					break
+				}
+			}
+		}
+		if len(said) > 0 {
+			out.Evidence = []string{"shipping page: " + strings.Join(said, " / ")}
+		}
+	}
+	if b, err := json.Marshal(out); err == nil {
+		_ = s.store.CachePut(ctx, key, string(b))
+	}
+	return delivery{verdict: out.Verdict, note: out.Note, evidence: out.Evidence, cost: -1}
+}
+
+var shipHint = []string{"ship", "deliver", "versand", "liefer", "livraison", "spedizion", "envío", "envio", "dostav", "isporu", "wysyłk", "verzend", "countries", "länder", "pays", "zemlj"}
+
+func mentionsShip(s string) bool {
+	low := strings.ToLower(s)
+	for _, w := range shipHint {
+		if strings.Contains(low, w) {
+			return true
+		}
+	}
+	return false
+}
+
+// deliverySummary adds one line on delivery to the hunt's summary.
+func deliverySummary(offers []store.Offer, hidden int, code string) string {
+	yes, unknown := 0, 0
+	for _, o := range offers {
+		switch o.Ships {
+		case "yes":
+			yes++
+		case "unknown":
+			unknown++
+		}
+	}
+	name := countries.Name(code)
+	parts := []string{}
+	if yes > 0 {
+		parts = append(parts, fmt.Sprintf("%d deliver to %s", yes, name))
+	}
+	if unknown > 0 {
+		parts = append(parts, fmt.Sprintf("%d not confirmed", unknown))
+	}
+	if hidden > 0 {
+		parts = append(parts, fmt.Sprintf("%d left out because they do not deliver there", hidden))
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return " Delivery: " + strings.Join(parts, ", ") + "."
+}
+
+// negation words that turn "we ship to X" into "we do not ship to X".
+var reNegation = regexp.MustCompile(`(?i)\b(not|no|don't|doesn't|cannot|can't|unfortunately|except|excluding|nicht|kein|keine|keinen|leider|ausgenommen|außer|ne|nije|nisu|nažalost|osim|pas|sauf|non|tranne|eccetto|niestety|oprócz|nie|niet|geen|behalve)\b`)
+
+func negated(around string) bool { return reNegation.MatchString(around) }
