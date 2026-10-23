@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { api, V1 } from '../lib/api'
 import { useApp } from '../lib/app-context'
 import { todayISO } from '../lib/format'
-import { EMOJIS, type Contact, type Kind, type List, type MoneyAccount, type MoneyCategory, type Preview, type Share, type SplitGroup, type Wish } from '../lib/types'
+import { EMOJIS, type AIStatus, type Contact, type Kind, type List, type MoneyAccount, type MoneyCategory, type Preview, type Share, type SplitGroup, type Wish } from '../lib/types'
 import { CoreHint, Field, Modal, Segmented, Spinner, Switch, copyText, useDebounce, useToast } from './ui'
 import { Select } from './Select'
 import { AmountInput, CurrencySelect, MoneyInput } from './Money'
@@ -391,6 +391,70 @@ export function ReserveModal({ wish, base, anonymous, onClose, onDone }: { wish:
           <button type="button" className="btn" onClick={onClose}>Close</button>
           {wish.status === 'wanted' && free > 0 && <button className="btn primary" disabled={busy}><Icon name="hand" size={15} />{wish.mine ? 'Save' : 'I’ll get this'}</button>}
         </div>
+      </form>
+    </Modal>
+  )
+}
+
+// ---------- "Find the best deal" ----------
+
+/** Which AI will judge, and whether search works — shown in the dialogs. */
+export function useAIStatus() {
+  const [st, setSt] = useState<AIStatus | null>(null)
+  useEffect(() => { api.get<AIStatus>(`${V1}/ai/status`).then(setSt).catch(() => {}) }, [])
+  return st
+}
+
+export function AIStatusLine({ st }: { st: AIStatus | null }) {
+  const { settings } = useApp()
+  if (!st) return null
+  if (!st.search) return <div className="callout warn"><Icon name="alert" size={15} /><span>No search engine is set up yet. <Link to="/settings/deals">Settings → Deal hunting</Link></span></div>
+  if (st.ready) return <p className="muted small row" style={{ gap: 6 }}><Icon name="sparkles" size={13} />{st.provider === 'pocket' ? 'Pocket AI' : 'Your OpenAI key'} plans the searches and checks every offer; nothing is bought for you.</p>
+  return (
+    <div className="callout info"><Icon name="info" size={15} /><div>
+      Without AI the hunt matches pages by their words only{st.detail ? ` (${st.detail})` : ''}. <Link to="/settings/deals">Connect an AI</Link>
+      {!settings?.core_configured && <CoreHint />}
+    </div></div>
+  )
+}
+
+export function HuntModal({ wish, lists, listId, onClose, onStarted }: { wish?: Wish; lists: List[]; listId?: number; onClose: () => void; onStarted: (w: Wish) => void }) {
+  const { settings } = useApp()
+  const { toast } = useToast()
+  const ai = useAIStatus()
+  const own = lists.filter(l => !l.archived)
+  const cur = wish?.currency || settings?.home_currency || 'EUR'
+  const [f, setF] = useState({
+    query: wish ? (wish.hunt_query || [wish.title, wish.notes].filter(Boolean).join(', ')) : '', max_price: wish?.hunt_max || 0,
+    condition: wish?.hunt_condition || 'new', auto: wish ? wish.hunt_auto : true, list_id: listId || own.find(l => l.kind === 'mine')?.id || own[0]?.id || 0,
+  })
+  const [busy, setBusy] = useState(false)
+  const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF(x => ({ ...x, [k]: v }))
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault(); setBusy(true)
+    try {
+      const body = { query: f.query, max_price: f.max_price, condition: f.condition, auto: f.auto, list_id: f.list_id, currency: cur }
+      const w = wish ? await api.post<Wish>(`${V1}/wishes/${wish.id}/hunt`, body) : await api.post<Wish>(`${V1}/hunt`, body)
+      toast('Hunting — this takes a minute')
+      onStarted(w)
+    } catch (e) { toast((e as Error).message, 'err') } finally { setBusy(false) }
+  }
+  const listOpts = own.map(l => ({ value: String(l.id), label: `${l.emoji ? l.emoji + ' ' : ''}${l.name}`, group: l.kind === 'gifts' ? 'Gift ideas' : 'My wishlists', hint: l.recipient }))
+  return (
+    <Modal title={wish ? 'Find a better deal' : 'Find the best deal'} onClose={onClose}>
+      <form onSubmit={submit} className="grid" style={{ gap: 14 }}>
+        <Field label="What do you want?" help="Be as exact as you like: brand, model, size, colour. “Sony WH-1000XM5 black”, “a 27-inch 4K monitor for photo editing under 400”, “LEGO 42115”.">
+          <textarea rows={3} value={f.query} onChange={e => set('query', e.target.value)} autoFocus required maxLength={500} placeholder="Sony WH-1000XM5, black, new" />
+        </Field>
+        <div className="two-col tight">
+          <Field label="Up to" help="Optional. Dearer offers are marked, not hidden."><MoneyInput value={f.max_price || null} code={cur} onChange={m => set('max_price', m || 0)} placeholder={`any price (${cur})`} /></Field>
+          <Field group label="Condition"><Segmented value={f.condition} onChange={v => set('condition', v as 'new' | 'any')} options={[{ value: 'new', label: 'New only' }, { value: 'any', label: 'Used is fine' }]} size="sm" /></Field>
+        </div>
+        {!wish && <Field label="Save to">{listOpts.length ? <Select value={String(f.list_id || '')} onChange={v => set('list_id', Number(v))} options={listOpts} /> : <input disabled value="My wishlist (made for you)" />}</Field>}
+        <label className="check-row"><Switch checked={f.auto} onChange={v => set('auto', v)} label="Keep hunting" /><span>Keep hunting every {settings?.hunt_every_days || 7} days and tell me when it gets cheaper</span></label>
+        <p className="muted small">Searches shops {settings?.deal_markets ? <>in <b>{settings.deal_markets}</b>{settings.deal_abroad ? ' and abroad when they deliver there' : ''}</> : 'everywhere'} (<Link to="/settings/deals">change</Link>), reads every shop page it finds and keeps only offers for exactly this item, cheapest first in {settings?.home_currency}.</p>
+        <AIStatusLine st={ai} />
+        <div className="form-actions"><span className="spacer" /><button type="button" className="btn" onClick={onClose}>Cancel</button><button className="btn primary" disabled={busy || !f.query.trim() || ai?.search === false}><Icon name="sparkles" size={15} />{wish ? 'Hunt again' : 'Find it'}</button></div>
       </form>
     </Modal>
   )

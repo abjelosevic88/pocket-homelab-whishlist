@@ -2,7 +2,7 @@ import { Modal } from './ui'
 
 const GROUPS: { title: string; keys: [string[], string][] }[] = [
   { title: 'Go to', keys: [[['h'], 'Home'], [['w'], 'All wishes'], [['d'], 'Price drops'], [['b'], 'Bought'], [['o'], 'Occasions'], [['s'], 'Shared with me'], [[','], 'Settings'], [['/'], 'Search & commands'], [['⌘', 'K'], 'Search & commands']] },
-  { title: 'New', keys: [[['l'], 'Add from a link'], [['n'], 'Add a wish'], [['g'], 'Gift ideas for someone']] },
+  { title: 'New', keys: [[['f'], 'Find the best deal'], [['l'], 'Add from a link'], [['n'], 'Add a wish'], [['g'], 'Gift ideas for someone']] },
   { title: 'Window', keys: [[['['], 'Show or hide the sidebar'], [['esc'], 'Close a dialog or menu']] },
   { title: 'Help', keys: [[['?'], 'This sheet']] },
 ]

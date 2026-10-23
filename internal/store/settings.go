@@ -21,7 +21,8 @@ func (s *Store) defaults() Settings {
 	return Settings{Title: DefaultTitle, HomeCurrency: cur, DateFormat: "auto", TimeFormat: "auto",
 		PriceCheckHours: 12, DropPercent: 5, OccasionDays: 30,
 		NotifyFormat: "apprise", NotifyDrops: true, NotifyOccasions: true, NotifyHour: 9,
-		InventoryTag: "wishlist", SplitCategory: "shopping", BoughtInventory: true, BoughtMoney: true}
+		InventoryTag: "wishlist", SplitCategory: "shopping", BoughtInventory: true, BoughtMoney: true,
+		AIProvider: "auto", DealMarkets: s.DefaultMarkets, DealAbroad: true, HuntEveryDays: 7}
 }
 
 // Every setting is stored as its JSON value under its JSON name, so adding a

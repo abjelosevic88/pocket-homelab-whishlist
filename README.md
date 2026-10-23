@@ -11,6 +11,7 @@
 
 ## What it does
 
+- **Find the best deal** — say what you want (“Sony WH-1000XM5, black, new, under 300”). Wishlist plans the searches (with Pocket AI or your own OpenAI key: the exact product name and model number, in the languages of the countries you buy from), searches through your SearXNG, reads every shop page it finds, and keeps only offers for exactly that item — not a case, not the older model. Every price shown was on the shop page or in the search result; anything else the AI says is dropped. Offers are ranked in your currency; the best becomes the wish's link and its price is watched. “Keep hunting” runs it again every week and pushes when it gets clearly cheaper. Without an AI it still works, matching by keywords.
 - **Add from a link** — schema.org Product data and Open Graph tags give the title, picture, price, currency and stock. A bookmarklet, `/add?url=…` for iOS Shortcuts and the PWA share target add from anywhere. Pictures are stored locally.
 - **Watch prices** — every watched page is read again on your schedule (12 h by default). The history is a chart on each wish; *Price drops* lists what is at your target; a push goes out once per drop (target reached, a drop of your percentage, back in stock).
 - **Wishlists and gift ideas** — your own lists, and lists for someone else with an occasion, a date (birthdays roll on every year), a budget and what you already bought.

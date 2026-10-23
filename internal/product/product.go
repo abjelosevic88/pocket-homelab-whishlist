@@ -479,6 +479,17 @@ func NormalizePrice(s string) string {
 	return s
 }
 
+// CurrencyFromSymbol maps "€", "KM", "$"… (and ISO codes) to an ISO code ("" = unknown).
+func CurrencyFromSymbol(s string) string {
+	if t := strings.ToUpper(strings.TrimSpace(s)); len(t) == 3 && t != "KN." {
+		switch t {
+		case "EUR", "USD", "GBP", "BAM", "CHF", "RSD", "HRK", "PLN", "CZK", "HUF", "SEK", "NOK", "DKK", "RON", "BGN", "TRY", "JPY", "CAD", "AUD":
+			return t
+		}
+	}
+	return currencyFromSymbol(s)
+}
+
 func currencyFromSymbol(s string) string {
 	switch strings.TrimSpace(s) {
 	case "€":
@@ -487,8 +498,10 @@ func currencyFromSymbol(s string) string {
 		return "USD"
 	case "£":
 		return "GBP"
-	case "KM", "km":
+	case "KM", "km", "Km":
 		return "BAM"
+	case "din", "din.", "RSD":
+		return "RSD"
 	case "¥":
 		return "JPY"
 	case "zł":

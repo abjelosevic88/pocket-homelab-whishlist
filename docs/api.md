@@ -31,6 +31,17 @@ JSON over HTTP at `/api/v1`. Authenticate with the session cookie (the web app),
 | GET/POST/DELETE | `/wishes/{id}/photo` | The picture (multipart `file` to upload) |
 | POST | `/preview` | `{"url"}` → what the page says (`product`, `price` in minor units, `currency`) |
 
+## Deal hunting
+
+| Method | Path | |
+|---|---|---|
+| POST | `/hunt` | `{"query":"Sony WH-1000XM5 black","max_price"|"max_text","condition":"new|any","auto":bool,"list_id","currency"}` → `202` and the new wish; the hunt runs in the background (`hunt_status`: `running` → `done` / `error`, `hunt_step` while it works) |
+| POST | `/wishes/{id}/hunt` | Hunt again, optionally with new terms (same fields) |
+| GET | `/wishes/{id}/offers?dismissed=1` | `{"offers":[{"url","store","title","price","currency","price_home","availability","match","source","note","over_budget"}],"home_currency"}` best first |
+| POST | `/wishes/{id}/offers/{oid}/use` | Make the offer the wish's link and price (and watch it) |
+| POST | `/wishes/{id}/offers/{oid}/dismiss` | `{"dismissed":false}` to bring it back |
+| GET | `/ai/status` · `/ai/models` | Which AI judges (`pocket`, `openai`, none) and whether search is set up; your Pocket AI models |
+
 ## Sharing and reservations
 
 A list owner never sees who reserved what — only, when the list has `show_reserved`, a count.
@@ -66,8 +77,8 @@ Wishlist offers two scopes to other Pocket apps (Core → Links):
 - `wishes:read` — `GET /lists`, `/lists/{id}`, `/wishes`, `/wishes/{id}`, `/wishes/{id}/prices|photo`, `/dashboard`, `/occasions`, `/tags`, `/day/{date}`. Only the person's own lists; never lists shared with them, never reservations.
 - `wishes:write` — `POST /wishes` (and `/preview`), `PUT`/`DELETE /wishes/{id}` **only for wishes that app added** (their `source` is its slug).
 
-Every other route answers `403` to a link token. Wishlist itself uses `items:read`/`items:write` in Inventory, `accounts:read`/`transactions:write` in Money, `groups:read`/`expenses:write` in Split and `contacts:read` in Contacts.
+Every other route answers `403` to a link token. Wishlist itself uses `inference:write` in Pocket AI (deal hunts), `items:read`/`items:write` in Inventory, `accounts:read`/`transactions:write` in Money, `groups:read`/`expenses:write` in Split and `contacts:read` in Contacts.
 
 ## Events (Pocket Core bus)
 
-`wishlist.wish_added`, `wishlist.price_dropped` (`was`, `target`, `why`: `target|drop`), `wishlist.back_in_stock`, `wishlist.bought` (`price`, `currency`, `date`, `store`, `gift_for`), `wishlist.reserved` — carrying the **giver's** `user_email`, never the list owner's, so a journal does not spoil the surprise.
+`wishlist.wish_added`, `wishlist.price_dropped` (`was`, `target`, `why`: `target|drop`), `wishlist.back_in_stock`, `wishlist.better_deal` (a repeat hunt found it clearly cheaper), `wishlist.bought` (`price`, `currency`, `date`, `store`, `gift_for`), `wishlist.reserved` — carrying the **giver's** `user_email`, never the list owner's, so a journal does not spoil the surprise.

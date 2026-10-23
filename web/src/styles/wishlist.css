@@ -314,3 +314,27 @@ a.occ-row:hover b { color: var(--accent-ink); }
   .public-inner { padding: 16px 14px 48px; }
 }
 .field-help, .help { overflow-wrap: anywhere; }
+
+/* deal hunting */
+.pill.hunting { background: var(--accent); color: #fff; animation: pulse 1.6s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .65; } }
+.deal-summary { font-size: 14px; line-height: 1.55; margin-bottom: 6px; }
+.offers { display: grid; margin-top: 10px; }
+.offer { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto auto; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--hairline); }
+.offer:first-child { border-top: 0; }
+.offer.best { background: linear-gradient(90deg, var(--accent-soft), transparent 70%); border-radius: 10px; padding-left: 8px; padding-right: 8px; border-top-color: transparent; }
+.offer-img { width: 52px; height: 52px; border-radius: 9px; background: #fff; border: 1px solid var(--border); display: grid; place-items: center; overflow: hidden; color: var(--muted); }
+.offer-img img { width: 100%; height: 100%; object-fit: contain; }
+.offer-main { min-width: 0; display: grid; gap: 2px; }
+.offer-top { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; min-width: 0; }
+.offer-title { font-size: 13px; color: var(--text-2); }
+.offer-price { display: grid; justify-items: end; gap: 1px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.offer-price b { font-size: 15px; }
+.offer-actions { display: flex; gap: 4px; align-items: center; }
+.badge.danger { background: var(--danger-soft); color: var(--danger); }
+@media (max-width: 640px) {
+  .offer { grid-template-columns: 44px minmax(0, 1fr) auto; }
+  .offer-img { width: 44px; height: 44px; }
+  .offer-actions { grid-column: 2 / -1; }
+}
+.sel-opt.is-disabled { opacity: .5; cursor: not-allowed; }

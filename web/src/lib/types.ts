@@ -22,6 +22,8 @@ export interface Settings {
   contacts_mode: ConnMode; contacts_via: ConnVia; contacts_detail: string; contacts_open_url: string
   contacts_url: string; contacts_token: string; contacts_public_url: string
   bought_inventory: boolean; bought_money: boolean
+  ai_provider: 'auto' | 'pocket' | 'openai'; ai_pocket_model: string; openai_api_key: string; openai_model: string; openai_base_url: string
+  search_url: string; search_default: string; deal_markets: string; deal_abroad: boolean; hunt_every_days: number
   max_upload_bytes: number; setup_complete: boolean; base_url: string
 }
 
@@ -43,9 +45,19 @@ export interface Wish {
   bought_at: string; bought_price: number; bought_currency: string; bought_store: string
   inventory_item_id: number | null; money_tx_id: number | null; split_expense_id: number | null; split_group_id: number | null; handoff_note: string
   source: string; sort_order: number; created_at: string; updated_at: string
+  hunt_query: string; hunt_max: number; hunt_condition: 'new' | 'any'; hunt_auto: boolean; hunt_status: '' | 'running' | 'done' | 'error'
+  hunt_step: string; hunt_at: string; hunt_summary: string; hunt_error: string; hunt_ai: '' | 'pocket' | 'openai'; hunt_best: number
   photo: string; list_name: string; list_kind: Kind; recipient: string; at_target: boolean; change: number
   reserved: number; mine: number; mine_note: string; mine_id: number; mine_bought: boolean
 }
+
+export interface Offer {
+  id: number; wish_id: number; url: string; store: string; title: string; image: string; price: number; currency: string; price_home: number
+  availability: string; match: 'exact' | 'variant' | 'used' | 'comparison' | 'unknown'; source: 'page' | 'snippet'; note: string; over_budget: boolean
+  rank: number; dismissed: boolean; found_at: string
+}
+export interface AIStatus { ready: boolean; provider: '' | 'pocket' | 'openai'; detail: string; search: boolean }
+export const MATCH: Record<string, string> = { exact: 'Exact match', variant: 'Variant', used: 'Used', comparison: 'Price comparison', unknown: 'Matched by name' }
 
 export interface PricePoint { at: string; price: number; currency: string; source: string }
 

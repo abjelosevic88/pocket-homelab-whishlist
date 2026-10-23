@@ -16,6 +16,7 @@ import (
 
 	core "github.com/abjelosevic88/pocket-homelab-core/sdk"
 	"github.com/abjelosevic88/pocket-homelab-wishlist/internal/config"
+	"github.com/abjelosevic88/pocket-homelab-wishlist/internal/fx"
 	"github.com/abjelosevic88/pocket-homelab-wishlist/internal/product"
 	"github.com/abjelosevic88/pocket-homelab-wishlist/internal/store"
 )
@@ -35,6 +36,7 @@ type Server struct {
 	requests atomic.Int64
 	errors   atomic.Int64
 	fetch    *product.Fetcher
+	fx       *fx.Client
 
 	notifyMu  sync.Mutex
 	notifyDay map[int64]string // per user: the day the occasion reminder went out
@@ -60,8 +62,10 @@ func New(cfg *config.Config, st *store.Store, log *slog.Logger, webFS fs.FS) *Se
 	if cfg.DefaultCurrency != "" {
 		st.DefaultCurrency = cfg.DefaultCurrency
 	}
+	st.DefaultMarkets = cfg.DealMarkets
 	return &Server{cfg: cfg, store: st, log: log, webFS: webFS, started: time.Now(), oidc: &oidcProvider{},
 		fetch:    &product.Fetcher{UserAgent: cfg.UserAgent, AllowPrivate: cfg.FetchPrivate},
+		fx:       fx.New(cfg.FXProvider, cfg.UserAgent, 15*time.Second),
 		core:     core.New(cfg.CoreURL, core.Options{DB: st.DB, TokenFile: cfg.DataDir + "/core.token", UserAgent: cfg.UserAgent}),
 		resolved: map[string]resolvedURL{}, notifyDay: map[int64]string{}}
 }
@@ -149,6 +153,9 @@ func (s *Server) ownerReady(ctx context.Context, owner int64) error {
 	set("SplitPublicURL", &st.SplitPublicURL, s.cfg.SplitPublicURL)
 	set("ContactsURL", &st.ContactsURL, s.cfg.ContactsURL)
 	set("ContactsToken", &st.ContactsToken, s.cfg.ContactsToken)
+	set("OpenAIKey", &st.OpenAIKey, s.cfg.OpenAIKey)
+	set("OpenAIModel", &st.OpenAIModel, s.cfg.OpenAIModel)
+	set("OpenAIBaseURL", &st.OpenAIBaseURL, s.cfg.OpenAIBaseURL)
 	if s.cfg.SplitGroupID > 0 {
 		once("SplitGroupID", st.SplitGroupID == 0, "1", func() { st.SplitGroupID = s.cfg.SplitGroupID })
 	}
@@ -170,7 +177,8 @@ func (s *Server) ownerReady(ctx context.Context, owner int64) error {
 }
 
 // janitor runs the background work every 15 minutes: price checks for the
-// wishes that are due, and once a day each person's occasion reminder.
+// wishes that are due, once a day each person's occasion reminder, and the
+// "keep hunting" deal hunts whose interval has passed.
 func (s *Server) janitor(ctx context.Context) {
 	first := time.NewTimer(20 * time.Second)
 	t := time.NewTicker(15 * time.Minute)
@@ -184,6 +192,7 @@ func (s *Server) janitor(ctx context.Context) {
 		}
 		s.checkDue(ctx)
 		s.maybeRemind(ctx)
+		s.autoHunts(ctx)
 	}
 }
 
@@ -220,17 +229,17 @@ func (s *Server) coreLoop(ctx context.Context) {
 }
 
 // eventTopics are what Wishlist publishes on the Core bus.
-var eventTopics = []string{"wishlist.wish_added", "wishlist.price_dropped", "wishlist.back_in_stock", "wishlist.bought", "wishlist.reserved"}
+var eventTopics = []string{"wishlist.wish_added", "wishlist.price_dropped", "wishlist.back_in_stock", "wishlist.better_deal", "wishlist.bought", "wishlist.reserved"}
 
 func (s *Server) registerWithCore(ctx context.Context) error {
 	m := core.Manifest{
 		Slug: "wishlist", Name: "Pocket Wishlist",
-		Description: "Wishlists and gift ideas: paste a shop link, watch the price, share a list so people can reserve gifts, and file what you buy in Inventory, Money and Split.",
+		Description: "Wishlists and gift ideas: say what you want and AI finds the best deal, or paste a shop link; prices are watched, lists shared so people can reserve gifts, and purchases filed in Inventory, Money and Split.",
 		Icon:        "/favicon.svg", Version: Version,
 		URL: s.cfg.CoreAppURL, PublicURL: s.cfg.BaseURL, HealthPath: "/healthz", EnvPrefix: "WISHLIST",
 		Publishes: eventTopics,
 		Offers:    linkOffers,
-		Uses:      linkUses(),
+		Uses:      append(linkUses(), core.InferenceUse()),
 	}
 	if s.cfg.BaseURL != "" {
 		// ask Core for a relying-party client so "Sign in with Pocket Core" needs no configuration

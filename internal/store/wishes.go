@@ -12,7 +12,8 @@ import (
 const wishCols = `w.id, w.user_id, w.list_id, w.title, w.url, w.store, w.notes, w.tags, w.image_url, w.photo_path, w.price, w.currency, w.target_price,
 	w.priority, w.quantity, w.status, w.track_price, w.availability, w.checked_at, w.check_error, w.lowest_price, w.alerted_price,
 	w.bought_at, w.bought_price, w.bought_currency, w.bought_store, w.inventory_item_id, w.money_tx_id, w.split_expense_id, w.split_group_id,
-	w.handoff_note, w.source, w.sort_order, w.created_at, w.updated_at,
+	w.handoff_note, w.source, w.hunt_query, w.hunt_max, w.hunt_condition, w.hunt_auto, w.hunt_status, w.hunt_step, w.hunt_at,
+	w.hunt_summary, w.hunt_error, w.hunt_ai, w.hunt_best, w.sort_order, w.created_at, w.updated_at,
 	l.name, l.kind, l.recipient,
 	COALESCE((SELECT p.price FROM price_history p WHERE p.wish_id = w.id AND p.currency = w.currency ORDER BY p.at, p.id LIMIT 1), 0),
 	(SELECT COALESCE(SUM(r.quantity), 0) FROM reservations r WHERE r.wish_id = w.id)`
@@ -26,7 +27,8 @@ func scanWish(row interface{ Scan(...any) error }) (*Wish, error) {
 	if err := row.Scan(&w.ID, &w.UserID, &w.ListID, &w.Title, &w.URL, &w.Store, &w.Notes, &w.Tags, &w.ImageURL, &w.PhotoPath, &w.Price, &w.Currency, &w.TargetPrice,
 		&w.Priority, &w.Quantity, &w.Status, &w.TrackPrice, &w.Availability, &w.CheckedAt, &w.CheckError, &w.LowestPrice, &w.AlertedPrice,
 		&w.BoughtAt, &w.BoughtPrice, &w.BoughtCurrency, &w.BoughtStore, &inv, &tx, &exp, &grp,
-		&w.HandoffNote, &w.Source, &w.SortOrder, &w.CreatedAt, &w.UpdatedAt,
+		&w.HandoffNote, &w.Source, &w.HuntQuery, &w.HuntMax, &w.HuntCondition, &w.HuntAuto, &w.HuntStatus, &w.HuntStep, &w.HuntAt,
+		&w.HuntSummary, &w.HuntError, &w.HuntAI, &w.HuntBest, &w.SortOrder, &w.CreatedAt, &w.UpdatedAt,
 		&w.ListName, &w.ListKind, &w.Recipient, &first, &w.Reserved); err != nil {
 		return nil, notFound(err)
 	}

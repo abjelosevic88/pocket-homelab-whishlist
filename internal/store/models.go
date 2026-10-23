@@ -105,6 +105,17 @@ type Wish struct {
 	SplitGroupID    *int64 `json:"split_group_id"`
 	HandoffNote     string `json:"handoff_note"`
 	Source          string `json:"source"`
+	HuntQuery       string `json:"hunt_query"`
+	HuntMax         int64  `json:"hunt_max"`
+	HuntCondition   string `json:"hunt_condition"`
+	HuntAuto        bool   `json:"hunt_auto"`
+	HuntStatus      string `json:"hunt_status"`
+	HuntStep        string `json:"hunt_step"`
+	HuntAt          string `json:"hunt_at"`
+	HuntSummary     string `json:"hunt_summary"`
+	HuntError       string `json:"hunt_error"`
+	HuntAI          string `json:"hunt_ai"`
+	HuntBest        int64  `json:"hunt_best"`
 	SortOrder       int    `json:"sort_order"`
 	CreatedAt       string `json:"created_at"`
 	UpdatedAt       string `json:"updated_at"`
@@ -125,6 +136,27 @@ type Wish struct {
 
 // Remaining is how many are still free to reserve.
 func (w *Wish) Remaining() int { return max(0, w.Quantity-w.Reserved) }
+
+// Offer is one shop's price for a wish, found by a deal hunt.
+type Offer struct {
+	ID           int64  `json:"id"`
+	WishID       int64  `json:"wish_id"`
+	URL          string `json:"url"`
+	Store        string `json:"store"`
+	Title        string `json:"title"`
+	Image        string `json:"image"`
+	Price        int64  `json:"price"`
+	Currency     string `json:"currency"`
+	PriceHome    int64  `json:"price_home"`
+	Availability string `json:"availability"`
+	Match        string `json:"match"`  // exact | variant | used | comparison | unknown
+	Source       string `json:"source"` // page | snippet
+	Note         string `json:"note"`
+	OverBudget   bool   `json:"over_budget"`
+	Rank         int    `json:"rank"`
+	Dismissed    bool   `json:"dismissed"`
+	FoundAt      string `json:"found_at"`
+}
 
 // PricePoint is one observed price.
 type PricePoint struct {
@@ -216,6 +248,19 @@ type Settings struct {
 	ContactsURL       string `json:"contacts_url"`
 	ContactsToken     string `json:"contacts_token"`
 	ContactsPublicURL string `json:"contacts_public_url"`
+
+	// Deal hunting: who judges the offers (Pocket AI through Core, or an
+	// OpenAI-compatible API with the person's own key), where to search, and
+	// which shops count (the AI is told where the person lives and buys).
+	AIProvider    string `json:"ai_provider"` // auto | pocket | openai
+	AIPocketModel string `json:"ai_pocket_model"`
+	OpenAIKey     string `json:"openai_api_key"`
+	OpenAIModel   string `json:"openai_model"`
+	OpenAIBaseURL string `json:"openai_base_url"`
+	SearchURL     string `json:"search_url"`      // SearXNG; "" = the box default
+	DealMarkets   string `json:"deal_markets"`    // "Bosnia and Herzegovina, Germany"
+	DealAbroad    bool   `json:"deal_abroad"`     // shops abroad that ship here count
+	HuntEveryDays int    `json:"hunt_every_days"` // "keep hunting" interval
 
 	// "Bought it" starts with these switched on.
 	BoughtInventory bool `json:"bought_inventory"`

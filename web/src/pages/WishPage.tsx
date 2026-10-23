@@ -9,6 +9,7 @@ import { Icon, KIND_ICON } from '../components/icons'
 import { announceChange, useCrumb, useLists, useOnChange } from '../components/Layout'
 import { BoughtModal, Handoff, WishModal } from '../components/forms'
 import { Change, PriceChart, PriorityStars, useMoney } from '../components/wish'
+import { DealsCard } from '../components/deals'
 
 export default function WishPage() {
   const { id } = useParams()
@@ -100,6 +101,8 @@ export default function WishPage() {
               </div>
             </Card>
           )}
+
+          <DealsCard w={w} onChanged={reload} />
 
           {w.notes && <Card title="Notes"><p style={{ whiteSpace: 'pre-wrap' }}>{w.notes}</p></Card>}
 

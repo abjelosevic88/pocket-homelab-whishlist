@@ -8,7 +8,7 @@ import { Icon } from './icons'
 import { Sidebar } from './Sidebar'
 import { CommandPalette, type PaletteCommand } from './CommandPalette'
 import { ShortcutsSheet } from './ShortcutsSheet'
-import { ListModal, WishModal } from './forms'
+import { HuntModal, ListModal, WishModal } from './forms'
 import { Avatar, type Anchor, type MenuItem, Menu, MenuButton, modalOpen, rectOf, useIsMobile, useMediaQuery } from './ui'
 import { AskButton } from './AskButton'
 
@@ -37,7 +37,7 @@ export function useCrumb(title: string | undefined) {
 const ListsCtx = createContext<{ lists: List[]; shared: List[]; reload: () => void }>({ lists: [], shared: [], reload: () => {} })
 export const useLists = () => useContext(ListsCtx)
 
-export type CreateKind = 'wish' | 'link' | 'list' | 'gifts'
+export type CreateKind = 'wish' | 'link' | 'hunt' | 'list' | 'gifts'
 
 /** Open a create dialog from anywhere (a page's button). */
 export const openCreate = (k: CreateKind) => window.dispatchEvent(new CustomEvent('pw:create', { detail: k }))
@@ -45,6 +45,7 @@ export const openCreate = (k: CreateKind) => window.dispatchEvent(new CustomEven
 /** The create menu: the sidebar's "New" button and the phone's + button. */
 export function createItems(onCreate: (k: CreateKind) => void): MenuItem[] {
   return [
+    { label: 'Find the best deal', icon: 'sparkles', hint: 'F', onSelect: () => onCreate('hunt') },
     { label: 'Add from a link', icon: 'link', hint: 'L', onSelect: () => onCreate('link') },
     { label: 'Add a wish', icon: 'plus', hint: 'N', onSelect: () => onCreate('wish') },
     'sep',
@@ -115,6 +116,7 @@ export default function Layout() {
         case '?': e.preventDefault(); setShortcuts(true); break
         case 'n': mk('wish'); break
         case 'l': mk('link'); break
+        case 'f': mk('hunt'); break
         case 'g': mk('gifts'); break
         case 'h': go('/'); break
         case 'w': go('/wishes'); break
@@ -131,6 +133,7 @@ export default function Layout() {
   }) // eslint-disable-line react-hooks/exhaustive-deps
 
   const commands: PaletteCommand[] = [
+    { id: 'hunt', label: 'Find the best deal', icon: 'sparkles', hint: 'F', keywords: 'ai search cheapest price shop compare', run: () => create('hunt') },
     { id: 'link', label: 'Add from a link', icon: 'link', hint: 'L', keywords: 'url shop paste product', run: () => create('link') },
     { id: 'wish', label: 'Add a wish', icon: 'plus', hint: 'N', keywords: 'new item', run: () => create('wish') },
     { id: 'list', label: 'New wishlist', icon: 'heart', keywords: 'create', run: () => create('list') },
@@ -171,6 +174,7 @@ export default function Layout() {
           {shortcuts && <ShortcutsSheet onClose={() => setShortcuts(false)} />}
           {(modal === 'wish' || modal === 'link') && <WishModal lists={lists} listId={defaultList} fromLink={modal === 'link'} initialURL={sharedURL} initialTitle={loc.pathname === '/add' ? sp.get('title') || '' : ''}
             onClose={closeModal} onSaved={w => { done(); navigate(`/lists/${w.list_id}`) }} />}
+          {modal === 'hunt' && <HuntModal lists={lists} listId={defaultList} onClose={closeModal} onStarted={w => { done(); navigate(`/wishes/${w.id}`) }} />}
           {(modal === 'list' || modal === 'gifts') && <ListModal kind={modal === 'gifts' ? 'gifts' : 'mine'} onClose={closeModal} onSaved={l => { done(); navigate(`/lists/${l.id}`) }} />}
         </div>
       </ListsCtx.Provider>

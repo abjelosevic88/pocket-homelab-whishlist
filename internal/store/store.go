@@ -37,6 +37,8 @@ type Store struct {
 
 	// DefaultCurrency is the home currency a person starts with (DEFAULT_CURRENCY).
 	DefaultCurrency string
+	// DefaultMarkets is where a person starts out shopping (DEAL_MARKETS).
+	DefaultMarkets string
 }
 
 // Open opens (and creates if needed) the SQLite database and runs migrations.

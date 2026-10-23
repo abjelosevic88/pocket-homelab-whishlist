@@ -66,6 +66,16 @@ type Config struct {
 	PriceChecksPerRun int
 	FetchPrivate      bool
 
+	// Deal hunting: the SearXNG that searches the web, the owner's OpenAI
+	// settings (copied once), where people shop by default, rates.
+	SearchURL     string
+	OpenAIKey     string
+	OpenAIModel   string
+	OpenAIBaseURL string
+	DealMarkets   string
+	HuntsPerRun   int
+	FXProvider    string // auto | frankfurter | erapi | none
+
 	// Outbound lookups identify as this.
 	UserAgent string
 
@@ -169,6 +179,13 @@ func Load() (*Config, error) {
 		ContactsToken:     env("CONTACTS_TOKEN", ""),
 		PriceChecksPerRun: envInt("PRICE_CHECKS_PER_RUN", 40),
 		FetchPrivate:      envBool("FETCH_PRIVATE", false),
+		SearchURL:         strings.TrimRight(env("SEARXNG_URL", ""), "/"),
+		OpenAIKey:         env("OPENAI_API_KEY", ""),
+		OpenAIModel:       env("OPENAI_MODEL", ""),
+		OpenAIBaseURL:     strings.TrimRight(env("OPENAI_BASE_URL", ""), "/"),
+		DealMarkets:       env("DEAL_MARKETS", ""),
+		HuntsPerRun:       envInt("HUNTS_PER_RUN", 3),
+		FXProvider:        strings.ToLower(env("FX_PROVIDER", "auto")),
 
 		UserAgent: env("USER_AGENT", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36 PocketWishlist/1.0"),
 

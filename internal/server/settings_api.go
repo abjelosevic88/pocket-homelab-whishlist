@@ -13,6 +13,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/abjelosevic88/pocket-homelab-wishlist/internal/ai"
 	"github.com/abjelosevic88/pocket-homelab-wishlist/internal/currency"
 	"github.com/abjelosevic88/pocket-homelab-wishlist/internal/notify"
 	"github.com/abjelosevic88/pocket-homelab-wishlist/internal/pocket"
@@ -48,6 +49,9 @@ func (s *Server) publicSettings(ctx context.Context, u *store.User, st store.Set
 		"split_member_id": st.SplitMemberID, "split_category": st.SplitCategory,
 		"contacts_url": st.ContactsURL, "contacts_token": mask(st.ContactsToken), "contacts_public_url": st.ContactsPublicURL,
 		"bought_inventory": st.BoughtInventory, "bought_money": st.BoughtMoney,
+		"ai_provider": st.AIProvider, "ai_pocket_model": st.AIPocketModel, "openai_api_key": mask(st.OpenAIKey), "openai_model": st.OpenAIModel,
+		"openai_base_url": st.OpenAIBaseURL, "search_url": st.SearchURL, "search_default": s.cfg.SearchURL, "deal_markets": st.DealMarkets,
+		"deal_abroad": st.DealAbroad, "hunt_every_days": st.HuntEveryDays,
 		"max_upload_bytes": s.cfg.MaxUploadBytes, "setup_complete": st.SetupComplete, "base_url": s.cfg.BaseURL,
 	}
 	for _, a := range pocketApps {
@@ -170,6 +174,27 @@ func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 	url("contacts_url", &cur.ContactsURL, in.ContactsURL)
 	secret("contacts_token", &cur.ContactsToken, in.ContactsToken)
 	url("contacts_public_url", &cur.ContactsPublicURL, in.ContactsPublicURL)
+	if keys["ai_provider"] {
+		if !validAIProvider(in.AIProvider) {
+			writeErr(w, http.StatusBadRequest, "AI is automatic, Pocket AI or OpenAI")
+			return
+		}
+		cur.AIProvider = in.AIProvider
+	}
+	if keys["ai_pocket_model"] {
+		if !validPocketModel(in.AIPocketModel) {
+			writeErr(w, http.StatusBadRequest, "unknown model")
+			return
+		}
+		cur.AIPocketModel = in.AIPocketModel
+	}
+	secret("openai_api_key", &cur.OpenAIKey, in.OpenAIKey)
+	text("openai_model", &cur.OpenAIModel, in.OpenAIModel)
+	url("openai_base_url", &cur.OpenAIBaseURL, in.OpenAIBaseURL)
+	url("search_url", &cur.SearchURL, in.SearchURL)
+	text("deal_markets", &cur.DealMarkets, in.DealMarkets)
+	boolIn("deal_abroad", &cur.DealAbroad, in.DealAbroad)
+	intIn("hunt_every_days", &cur.HuntEveryDays, in.HuntEveryDays, 1, 60)
 	boolIn("bought_inventory", &cur.BoughtInventory, in.BoughtInventory)
 	boolIn("bought_money", &cur.BoughtMoney, in.BoughtMoney)
 	mode := func(k string, dst *string, v string) {
@@ -270,6 +295,12 @@ func (s *Server) handleIntegrationTest(w http.ResponseWriter, r *http.Request) {
 					msg = fmt.Sprintf("Pocket Contacts %s, %s, %d birthdays in the next 60 days", v, how, len(bs))
 				}
 			}
+		}
+	} else if in.Which == "openai" {
+		c := ai.New(urlOr(st.OpenAIBaseURL), keyOr(st.OpenAIKey), st.OpenAIModel, 20*time.Second)
+		var ids []string
+		if ids, err = c.Models(ctx); err == nil {
+			msg = fmt.Sprintf("The key works (%d models)", len(ids))
 		}
 	} else if in.Which == "notify" {
 		f := in.Format

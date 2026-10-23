@@ -27,6 +27,11 @@ Everything is read from environment variables; every value has a default, so a b
 | `SPLIT_URL` / `SPLIT_TOKEN` / `SPLIT_PUBLIC_URL` / `SPLIT_GROUP_ID` | – | Pocket Split: shared purchases and group gifts (public URL = what the browser opens) |
 | `CONTACTS_URL` / `CONTACTS_TOKEN` | – | Pocket Contacts: gift recipients and their birthdays |
 | `NOTIFY_URL` / `NOTIFY_FORMAT` | – / guessed | Apprise `…/notify/<key>`, ntfy topic URL or JSON webhook; `apprise`, `ntfy`, `json` |
+| `SEARXNG_URL` | – | The SearXNG that deal hunts search with (JSON format on: `formats: [html, json]`). Each person can set their own under Settings → Deal hunting |
+| `OPENAI_API_KEY` / `OPENAI_MODEL` / `OPENAI_BASE_URL` | – / `gpt-4o-mini` / OpenAI | The owner's own OpenAI-compatible AI for deal hunts (copied once). With Pocket Core, Pocket AI is used instead when the `inference:write` link is on |
+| `DEAL_MARKETS` | – | Where people start out shopping (“Bosnia and Herzegovina, Germany”): the AI searches in those languages |
+| `HUNTS_PER_RUN` | `3` | At most this many “keep hunting” hunts per 15-minute sweep |
+| `FX_PROVIDER` | `auto` | Exchange rates for ranking offers in the home currency: Frankfurter, then open.er-api.com (`none` = off) |
 | `PRICE_CHECKS_PER_RUN` | `40` | At most this many shop pages are read per 15-minute sweep (one at a time, 3 s apart per shop) |
 | `FETCH_PRIVATE` | `false` | Let link previews and price checks reach private / loopback / tailnet addresses. Off, a member cannot make the server probe your LAN |
 | `USER_AGENT` | a desktop Chrome string + `PocketWishlist/1.0` | Sent to shops (many refuse obvious bots) |
@@ -56,3 +61,13 @@ Inside the container: `docker exec pocket-wishlist pocket-wishlist backup`.
 Each person picks how often their watched wishes are read again (Settings → General → Price watching, 12 h by default, 0 = never) and how big a drop is worth a push (5 % by default, besides the target price). The janitor runs every 15 minutes and reads the pages that are due, least recently checked first. A page that no longer shows a price keeps the last known one and says why on the wish. An alert is sent once per drop; when the price goes back up, the next drop alerts again. "Back in stock" alerts once too.
 
 Prices come from what shops publish for link previews: schema.org `Product` / `Offer` data (JSON-LD or microdata) and the Open Graph `product:price:*` tags. Shops that build their pages in the browser only, or block servers, show no price — type it in and the wish works the same, just without watching.
+
+## Deal hunts
+
+1. **Plan** — the AI turns the request into the exact product name, what an offer must match, what means a different item, and 3–6 searches in the languages of your countries. Without AI: the request itself, plus “price” / “kaufen”.
+2. **Search** — the searches run in parallel on SearXNG; up to 24 pages are kept, at most 3 per shop, never video / social / review sites.
+3. **Read** — every page goes through the same reader as “Add from a link” (6 at a time). Prices written in the search results (“ab 194,99 €”) are kept too.
+4. **Judge** — the AI labels each page exact / variant / used / comparison (accessories and unrelated pages are left out). A price it reports must match the page or the search result within 1 %, or the offer is dropped.
+5. **Rank** — converted to your currency at today's rate; exact matches, in stock, within budget, cheapest first. Dismissed offers stay hidden in later hunts.
+
+The request and the pages found are sent to the AI you chose (Pocket AI = your own Claude account through Pocket Core).

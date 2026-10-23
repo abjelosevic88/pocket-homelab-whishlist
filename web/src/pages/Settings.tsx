@@ -10,11 +10,14 @@ import { Icon } from '../components/icons'
 import { Select } from '../components/Select'
 import { CurrencySelect } from '../components/Money'
 import { ShortcutsSheet } from '../components/ShortcutsSheet'
+import { PocketModelSelect } from '../components/PocketModelSelect'
+import { AIStatusLine, useAIStatus } from '../components/forms'
 
-type TabId = 'general' | 'notifications' | 'apps' | 'profile' | 'people' | 'tokens' | 'data' | 'about'
+type TabId = 'general' | 'deals' | 'notifications' | 'apps' | 'profile' | 'people' | 'tokens' | 'data' | 'about'
 
 const TABS: { id: TabId; label: string; icon: string; sub: string }[] = [
   { id: 'general', label: 'General', icon: 'settings', sub: 'Currency, price watching, what “Bought it” does by default, date formats and the app title.' },
+  { id: 'deals', label: 'Deal hunting', icon: 'sparkles', sub: 'Which AI checks the offers, the search engine, and where you buy.' },
   { id: 'notifications', label: 'Notifications', icon: 'bell', sub: 'A push when a price drops, and a reminder before birthdays and other gift occasions.' },
   { id: 'apps', label: 'Connected apps', icon: 'layers', sub: 'Pocket Inventory, Pocket Money, Pocket Split and Pocket Contacts — through Pocket Core or directly.' },
   { id: 'profile', label: 'Profile', icon: 'user', sub: 'Your name, email and password.' },
@@ -72,6 +75,7 @@ export default function Settings() {
               <p>{current.sub}</p>
             </div>
             {tab === 'general' && <General />}
+            {tab === 'deals' && <Deals />}
             {tab === 'notifications' && <Notifications />}
             {tab === 'apps' && <Integrations />}
             {tab === 'profile' && <Profile />}
@@ -159,6 +163,51 @@ function General() {
           <div><dt>Bought it</dt><dd className="muted">Files the purchase in your Pocket Inventory (with price, date and shop), books it in Pocket Money and, for a shared purchase or a group gift, in Pocket Split.</dd></div>
         </dl>
       </Section>
+    </div>
+  )
+}
+
+function Deals() {
+  const { f, setF, save, busy } = useSettingsForm()
+  const { run, status } = useTester()
+  const ai = useAIStatus()
+  if (!f) return <Loading />
+  const coreOn = f.core_configured && f.core_registered !== false
+  // Pocket AI only comes through Pocket Core: without one a saved "pocket" shows as what is in effect.
+  const shown = !coreOn && f.ai_provider === 'pocket' ? 'openai' : (f.ai_provider || 'auto')
+  return (
+    <div className="stack loose">
+      <Section title="How a hunt works" icon="sparkles" sub={<>“Find the best deal” plans searches for what you describe, runs them through the search engine below, reads every shop page it finds, and lets the AI keep only offers for exactly that item (not a case, not the older model). Every price it shows was on the shop page or in the search result — anything else is dropped. Your request and the pages found are sent to the AI you pick; nothing is bought for you.</>}>
+        <AIStatusLine st={ai} />
+      </Section>
+      <Section title="AI" icon="sparkles">
+        <div className="grid" style={{ gap: 12 }}>
+          <Field group label="Who checks the offers" help="Automatic prefers your enabled Pocket AI connection; without one it uses your OpenAI settings; with neither, hunts match by keywords only.">
+            <Select ariaLabel="AI provider" value={shown} onChange={v => setF({ ...f, ai_provider: v as SettingsT['ai_provider'] })} options={[{ value: 'auto', label: coreOn ? 'Automatic — prefer Pocket AI' : 'Automatic' }, { value: 'pocket', label: 'Pocket AI', disabled: !coreOn, hint: coreOn ? undefined : 'needs Pocket Core' }, { value: 'openai', label: 'OpenAI / compatible API' }]} />
+          </Field>
+          {!coreOn && <CoreHint />}
+          {coreOn && shown !== 'openai' && <PocketModelSelect value={f.ai_pocket_model || ''} onChange={v => setF({ ...f, ai_pocket_model: v })} />}
+          {(shown === 'openai' || (!coreOn && shown === 'auto')) && <>
+            <Field label="OpenAI API key" help="platform.openai.com → API keys. Stored on the server; shown masked."><input value={f.openai_api_key} onChange={e => setF({ ...f, openai_api_key: e.target.value })} autoComplete="off" placeholder="sk-…" /></Field>
+            <div className="two-col tight">
+              <Field label="Model" help="Default gpt-4o-mini."><input value={f.openai_model} onChange={e => setF({ ...f, openai_model: e.target.value })} placeholder="gpt-4o-mini" /></Field>
+              <Field label="Base URL (optional)" help="Ollama, LM Studio, OpenRouter…"><input value={f.openai_base_url} onChange={e => setF({ ...f, openai_base_url: e.target.value })} placeholder="https://api.openai.com/v1" /></Field>
+            </div>
+          </>}
+        </div>
+      </Section>
+      <Section title="Where you buy" icon="store">
+        <SettingRow title="Countries" help="The AI searches in their languages and leaves out shops that cannot sell there." stack><input value={f.deal_markets} onChange={e => setF({ ...f, deal_markets: e.target.value })} placeholder="Bosnia and Herzegovina, Germany, Croatia" /></SettingRow>
+        <SettingRow title="Shops abroad" help="Online shops in other countries that deliver to you."><Switch checked={f.deal_abroad} onChange={v => setF({ ...f, deal_abroad: v })} label="Include shops abroad that deliver" /></SettingRow>
+        <SettingRow title="Keep hunting every" help="For wishes with “keep hunting” on; a clearly cheaper offer sends a push."><span className="row"><input type="number" min={1} max={60} value={f.hunt_every_days} onChange={e => setF({ ...f, hunt_every_days: Number(e.target.value) })} className="set-time" /><span className="muted small">days</span></span></SettingRow>
+      </Section>
+      <Section title="Search engine" icon="search" sub={<>A <a href="https://docs.searxng.org" target="_blank" rel="noreferrer">SearXNG</a> instance with the JSON format switched on (<code>formats: [html, json]</code>). It asks several search engines at once and needs no API key.</>}>
+        <SettingRow title="SearXNG address" help={f.search_default ? `Empty = the box default (${f.search_default}).` : 'Required for hunts.'} stack><input value={f.search_url} onChange={e => setF({ ...f, search_url: e.target.value })} placeholder={f.search_default || 'http://searxng:8080'} /></SettingRow>
+      </Section>
+      <div className="row wrap">
+        <button type="button" className="btn primary" onClick={() => save()} disabled={busy}>Save changes</button>
+        {(shown === 'openai' || (!coreOn && shown === 'auto')) && <><button type="button" className="btn" onClick={() => run('openai', f.openai_base_url, f.openai_api_key)} disabled={!f.openai_api_key}>Test the OpenAI key</button>{status('openai')}</>}
+      </div>
     </div>
   )
 }

@@ -46,6 +46,7 @@ export function WishCard({ w, onOpen, viewer, showList }: { w: Wish; onOpen: () 
       <div className="cover">
         {w.photo ? <img src={w.photo} alt="" loading="lazy" /> : <Icon name={KIND_ICON[w.list_kind] || 'gift'} size={40} strokeWidth={1.4} />}
         <div className="flags">
+          {!viewer && w.hunt_status === 'running' && <span className="pill hunting"><Icon name="sparkles" size={11} strokeWidth={2.2} />Hunting…</span>}
           {w.status === 'bought' && <span className="pill bought"><Icon name="check" size={11} strokeWidth={2.6} />{viewer ? 'Got it' : 'Bought'}</span>}
           {!viewer && w.status === 'wanted' && w.at_target && <span className="pill target"><Icon name="trending-down" size={11} strokeWidth={2.4} />At target</span>}
           {!viewer && w.status === 'wanted' && !w.at_target && changePct(w) <= -5 && <span className="pill drop"><Icon name="trending-down" size={11} strokeWidth={2.4} />{changePct(w)}%</span>}
