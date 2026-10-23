@@ -9,6 +9,40 @@
 
 ---
 
+<p align="center"><img src="docs/screenshots/desktop-home.png" width="900" alt="Home: wishes at their target price, the next birthday and what was bought recently"></p>
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/desktop-list.png" alt="A wishlist with pictures, prices, price drops and reserved wishes"></td>
+    <td width="50%"><img src="docs/screenshots/desktop-price-chart.png" alt="A wish with its price history chart and target price"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>A wishlist; the owner sees that something is reserved, never by whom.</sub></td>
+    <td align="center"><sub>Every watched price keeps its history, with the target you set.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/desktop-price-drops.png" alt="Price drops: every wish at or below its target price"></td>
+    <td width="50%"><img src="docs/screenshots/desktop-gift-list.png" alt="A gift list for a birthday with its budget bar"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Price drops: everything at or below the price you said you would pay.</sub></td>
+    <td align="center"><sub>Gift ideas for someone, with the date and how much of the budget is spent.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/desktop-share-link.png" alt="The shared list as a giver sees it, without an account"></td>
+    <td width="50%"><img src="docs/screenshots/desktop-reserve.png" alt="A giver saying I'll get this for a wish"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>The link you send: no account needed to see the list.</sub></td>
+    <td align="center"><sub>“I’ll get this”, so nobody buys the same present twice.</sub></td>
+  </tr>
+</table>
+
+<p align="center">
+  <img src="docs/screenshots/phone-list.png" width="240" alt="A wishlist on a phone">&nbsp;&nbsp;
+  <img src="docs/screenshots/phone-share-link.png" width="240" alt="The shared list on a giver's phone">
+</p>
+
 ## What it does
 
 - **Find the best deal** — say what you want (“Sony WH-1000XM5, black, new, under 300”). Wishlist plans the searches (with Pocket AI or your own OpenAI key: the exact product name and model number, in the languages of the countries you buy from), searches through your SearXNG, reads every shop page it finds, and keeps only offers for exactly that item — not a case, not the older model. Every price shown was on the shop page or in the search result; anything else the AI says is dropped. Offers are ranked in your currency; the best becomes the wish's link and its price is watched. “Keep hunting” runs it again every week and pushes when it gets clearly cheaper. Without an AI it still works, matching by keywords.
