@@ -1,10 +1,13 @@
 <p align="center"><img src="web/public/favicon.svg" width="72" alt=""></p>
+<h1 align="center">Pocket Wishlist</h1>
+<p align="center">Self-hosted wishlists and gift ideas. Paste a link to anything in any shop: the name, picture and price are read from the page, the price is watched, and you get a push when it reaches your target. Share a list with family so they can say “I’ll get this” — nobody buys the same present twice and you never see who got what. Collect gift ideas for the people you buy for, with their birthdays from Pocket Contacts. When you buy something, it goes into your Pocket Inventory, Pocket Money and, for a shared purchase or a group gift, Pocket Split.<br>One Go binary, one SQLite file, one volume. Part of the Pocket apps; works on its own too.</p>
+<p align="center">
+  <a href="https://github.com/abjelosevic88/pocket-homelab-whishlist/actions"><img src="https://github.com/abjelosevic88/pocket-homelab-whishlist/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://github.com/abjelosevic88/pocket-homelab-whishlist/pkgs/container/pocket-homelab-whishlist"><img src="https://img.shields.io/badge/ghcr.io-amd64%20%7C%20arm64%20%7C%20armv7-blue" alt="image"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT"></a>
+</p>
 
-# Pocket Wishlist
-
-Self-hosted wishlists and gift ideas. Paste a link to anything in any shop: the name, picture and price are read from the page, the price is watched, and you get a push when it reaches your target. Share a list with family so they can say “I’ll get this” — nobody buys the same present twice and you never see who got what. Collect gift ideas for the people you buy for, with their birthdays from Pocket Contacts. When you buy something, it goes into your Pocket Inventory, Pocket Money and, for a shared purchase or a group gift, Pocket Split.
-
-One Go binary with the web app embedded, one SQLite file, one volume. Part of the Pocket apps; works on its own too.
+---
 
 ## What it does
 
