@@ -1,0 +1,33 @@
+# Pocket Wishlist — self-hosted wishlists, gift ideas and price watching (Go + SQLite). One container, one volume.
+services:
+  pocket-wishlist:
+    image: ghcr.io/abjelosevic88/pocket-homelab-whishlist:latest
+    container_name: pocket-wishlist
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      TZ: ${TZ:-Europe/Berlin}
+      BASE_URL: ${BASE_URL:-http://localhost:8080}
+      DEFAULT_CURRENCY: ${DEFAULT_CURRENCY:-EUR}
+      # SECURE_COOKIES: "true"          # behind HTTPS
+      # First admin (only used while the database has no users):
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      # The owner's own connections; everything can also be set under Settings → Connected apps.
+      INVENTORY_URL: ${INVENTORY_URL:-}
+      INVENTORY_TOKEN: ${INVENTORY_TOKEN:-}
+      MONEY_URL: ${MONEY_URL:-}
+      MONEY_TOKEN: ${MONEY_TOKEN:-}
+      SPLIT_URL: ${SPLIT_URL:-}
+      SPLIT_TOKEN: ${SPLIT_TOKEN:-}
+      CONTACTS_URL: ${CONTACTS_URL:-}
+      CONTACTS_TOKEN: ${CONTACTS_TOKEN:-}
+      NOTIFY_URL: ${NOTIFY_URL:-}
+      # Pocket Core: one sign-in and app links instead of tokens.
+      # CORE_URL: http://pocket-core:8080
+      # CORE_REGISTRATION_KEY: ${CORE_REGISTRATION_KEY}
+    volumes:
+      - ./data:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

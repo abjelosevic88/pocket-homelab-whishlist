@@ -1,0 +1,23 @@
+[Unit]
+Description=Pocket Wishlist — self-hosted wishlists, gift ideas and price watching
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=pocket-wishlist
+Group=pocket-wishlist
+ExecStart=/usr/local/bin/pocket-wishlist
+Environment=DATA_DIR=/var/lib/pocket-wishlist
+Environment=PORT=8080
+Environment=BASE_URL=https://wishlist.example.com
+Environment=SECURE_COOKIES=true
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/pocket-wishlist
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

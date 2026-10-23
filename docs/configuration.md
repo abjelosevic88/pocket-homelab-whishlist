@@ -1,0 +1,58 @@
+# Configuration
+
+Everything is read from environment variables; every value has a default, so a bare `docker run -v ./data:/data` works. Integration values seed the owner's settings on first start and can be changed later under **Settings → Connected apps** (the UI values win afterwards).
+
+| Variable | Default | What it does |
+|---|---|---|
+| `PORT` / `HOST` | `8080` / `0.0.0.0` | Listen address |
+| `BASE_URL` | – | Public URL: share links, notification links, the OIDC callback |
+| `DATA_DIR` | `./data` (`/data` in the image) | SQLite database, wish pictures and backups |
+| `DB_PATH` / `FILES_DIR` | `$DATA_DIR/pocket-wishlist.db` / `$DATA_DIR/files` | Override locations |
+| `TZ` | – | Container timezone (mount `/usr/share/zoneinfo` on Alpine-based hosts if dates look off) |
+| `LOG_LEVEL` / `LOG_FORMAT` | `info` / `text` | `debug`, `warn`, `error`; `json` |
+| `TRUST_PROXY` | `true` | Honour `X-Forwarded-For` |
+| `METRICS_ENABLED` | `true` | Prometheus `/metrics` (row counts and price checks only, never content) |
+| `MAX_UPLOAD_BYTES` | `20971520` | Picture upload limit |
+| `AUTH_MODE` | `local` | `local` (built-in accounts), `proxy` (trust `AUTH_PROXY_HEADER`), `none` (single user, LAN only) |
+| `AUTH_PROXY_HEADER` / `AUTH_PROXY_EMAIL_HEADER` | `Remote-User` / `Remote-Email` | Headers for proxy mode |
+| `SESSION_TTL` | `720h` | Cookie lifetime |
+| `SECURE_COOKIES` | `false` | Set `true` behind HTTPS (on plain http the browser drops the cookie and login bounces) |
+| `OIDC_ISSUER` / `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` | – | Sign in with an OpenID Connect provider (PocketID, Authelia, Authentik, Keycloak…). Needs `BASE_URL`; the callback is `BASE_URL/api/v1/auth/oidc/callback`. On a box with Pocket Core none of these are needed — the app receives its client when it registers. |
+| `OIDC_NAME` | `single sign-on` | Button label: “Sign in with …” (“Pocket Core” when the client came from Core) |
+| `OIDC_AUTO_CREATE` | `true` | Give an unknown (verified) email a member account instead of refusing it |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` / `ADMIN_NAME` | – | Create the first admin on an empty database (otherwise the UI asks) |
+| `DEFAULT_CURRENCY` | `EUR` | The currency a new person starts with |
+| `INVENTORY_URL` / `INVENTORY_TOKEN` | – | Pocket Inventory and an API token. These and the `MONEY_*` / `SPLIT_*` / `CONTACTS_*` / `NOTIFY_*` values are the owner's (first admin's) own direct connections, each copied once (clearing one in Settings keeps it cleared); everyone else sets their own, or uses Pocket Core app links with nothing to paste |
+| `MONEY_URL` / `MONEY_TOKEN` | – | Pocket Money: “Bought it” books the expense |
+| `SPLIT_URL` / `SPLIT_TOKEN` / `SPLIT_PUBLIC_URL` / `SPLIT_GROUP_ID` | – | Pocket Split: shared purchases and group gifts (public URL = what the browser opens) |
+| `CONTACTS_URL` / `CONTACTS_TOKEN` | – | Pocket Contacts: gift recipients and their birthdays |
+| `NOTIFY_URL` / `NOTIFY_FORMAT` | – / guessed | Apprise `…/notify/<key>`, ntfy topic URL or JSON webhook; `apprise`, `ntfy`, `json` |
+| `PRICE_CHECKS_PER_RUN` | `40` | At most this many shop pages are read per 15-minute sweep (one at a time, 3 s apart per shop) |
+| `FETCH_PRIVATE` | `false` | Let link previews and price checks reach private / loopback / tailnet addresses. Off, a member cannot make the server probe your LAN |
+| `USER_AGENT` | a desktop Chrome string + `PocketWishlist/1.0` | Sent to shops (many refuse obvious bots) |
+| `CORE_URL` / `CORE_REGISTRATION_KEY` | – | [Pocket Core](https://github.com/abjelosevic88/pocket-homelab-core): register on start (the key is needed once; the app token lives in `$DATA_DIR/core.token`), sign in with Pocket Core, accept the tokens Core hands to paired phones, act in each person's own Inventory / Money / Split / Contacts through app links, offer `wishes:read` / `wishes:write`, publish events, report connection modes for Core's Links page |
+| `CORE_APP_URL` | `BASE_URL` | How Core reaches this app for health checks (e.g. `http://host.docker.internal:8198`) |
+| `DEMO_DATA` | `false` | Seed four lists and nine wishes into an empty owner account |
+
+## Auth modes
+
+- **local** — accounts with email + password. The first account becomes admin (the owner). Accounts created on first contact (Pocket Core / OIDC sign-in, Core device tokens) are members.
+- **proxy** — trust a forward-auth proxy (Authelia, Authentik, Tinyauth…). Users are created on first visit. Keep `/s/*`, `/api/v1/s/*` and any bearer-token routes outside the forward-auth rule.
+- **none** — no login at all; one implicit admin. Only for a trusted LAN (shared links then treat every visitor as the owner).
+
+## CLI
+
+```
+pocket-wishlist                     start the server (default)
+pocket-wishlist backup [-o FILE]    write a consistent SQLite backup
+pocket-wishlist reset-password [-email USER] [-password NEW]
+pocket-wishlist version
+```
+
+Inside the container: `docker exec pocket-wishlist pocket-wishlist backup`.
+
+## Price checks
+
+Each person picks how often their watched wishes are read again (Settings → General → Price watching, 12 h by default, 0 = never) and how big a drop is worth a push (5 % by default, besides the target price). The janitor runs every 15 minutes and reads the pages that are due, least recently checked first. A page that no longer shows a price keeps the last known one and says why on the wish. An alert is sent once per drop; when the price goes back up, the next drop alerts again. "Back in stock" alerts once too.
+
+Prices come from what shops publish for link previews: schema.org `Product` / `Offer` data (JSON-LD or microdata) and the Open Graph `product:price:*` tags. Shops that build their pages in the browser only, or block servers, show no price — type it in and the wish works the same, just without watching.
