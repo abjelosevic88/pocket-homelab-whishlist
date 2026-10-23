@@ -39,7 +39,7 @@ export function OccasionRow({ o }: { o: Occasion }) {
   const to = o.list_id ? `/lists/${o.list_id}` : `/lists/new?kind=gifts&recipient=${encodeURIComponent(o.person)}&contact=${o.contact_id || ''}&occasion=${encodeURIComponent(o.title)}&date=${o.date}`
   return (
     <Link className="occ-row" to={to}>
-      <span className={`occ-date ${soon ? 'soon' : ''}`}><span className="m">{MONTHS[m - 1]}</span><span className="d">{d}</span></span>
+      <span className={`occ-date ${soon ? 'soon' : ''}`}><span className="occ-m">{MONTHS[m - 1]}</span><span className="occ-d">{d}</span></span>
       <span style={{ minWidth: 0 }}>
         <b>{who}{who && ' · '}{o.title}{o.age ? ` (${o.age})` : ''}</b>
         <div className="s">{status}{budget}</div>
