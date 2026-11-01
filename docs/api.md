@@ -26,6 +26,7 @@ JSON over HTTP at `/api/v1`. Authenticate with the session cookie (the web app),
 | PUT | `/wishes/{id}` | Partial update; a changed price is recorded in the history |
 | DELETE | `/wishes/{id}` | |
 | POST | `/wishes/{id}/check` | Read the page now |
+| POST / DELETE | `/wishes/{id}/lookout` | Let Pocket Lookout read this price (a browser watch on the shop's price and stock) / read it here again |
 | POST | `/wishes/{id}/status` | `{"status":"wanted|bought|archived"}` — no hand-off |
 | POST | `/wishes/{id}/bought` | `{"date","price","currency","store","notes","inventory":bool,"inventory_location","inventory_category","money":bool,"money_account_id","money_category_id","split":bool,"split_group_id","split_member_id"}` → `{"wish","pending"}`. Marks it bought and files it in your Pocket apps (durable, retried, never twice); `409` when it is bought already |
 | GET/POST/DELETE | `/wishes/{id}/photo` | The picture (multipart `file` to upload) |

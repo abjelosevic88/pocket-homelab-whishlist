@@ -74,23 +74,7 @@ func (s *Server) checkDue(ctx context.Context) int {
 // checkOne reads a wish's page again and records what it found.
 func (s *Server) checkOne(ctx context.Context, wi *store.Wish, st store.Settings) (store.CheckResult, error) {
 	priceChecks.Add(1)
-	pctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	p, err := s.fetch.Fetch(pctx, wi.URL)
-	cancel()
-	res := store.CheckResult{}
-	if err != nil && (p == nil || p.Price == "") {
-		res.Err = err.Error()
-	}
-	if p != nil {
-		cur := p.Currency
-		if cur == "" || !currency.Valid(cur) {
-			cur = wi.Currency
-		}
-		res.Price, res.Currency, res.Availability = product.ToMinor(p.Price, currency.Decimals(cur)), cur, p.Availability
-	}
-	if res.Err == "" && res.Price <= 0 {
-		res.Err = "no price on the page any more"
-	}
+	res := s.readPrice(ctx, wi, st)
 	alert := s.alertFor(wi, res, st)
 	topic := ""
 	switch alert.kind {
@@ -183,7 +167,7 @@ func (s *Server) handleCheckNow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	st, _ := s.store.GetSettings(ctx, wi.UserID)
-	res, err := s.checkOne(ctx, wi, st)
+	res, err := s.checkOne(context.WithValue(ctx, freshKey, true), wi, st)
 	if err != nil {
 		s.fail(w, err, "check")
 		return
@@ -425,4 +409,42 @@ func (s *Server) sendReminder(ctx context.Context, uid int64, st store.Settings,
 		return 0, err
 	}
 	return len(lines), nil
+}
+
+// readPrice reads a wish's price: from its Pocket Lookout watch when it has
+// one, else from the shop page — and when the shop turns robots away or shows
+// no price without JavaScript, hands the page to Lookout (Settings).
+func (s *Server) readPrice(ctx context.Context, wi *store.Wish, st store.Settings) store.CheckResult {
+	if res, ok := s.lookoutRead(ctx, wi); ok {
+		return res
+	}
+	pctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	p, err := s.fetch.Fetch(pctx, wi.URL)
+	cancel()
+	res := store.CheckResult{}
+	if err != nil && (p == nil || p.Price == "") {
+		res.Err = err.Error()
+	}
+	if p != nil {
+		cur := p.Currency
+		if cur == "" || !currency.Valid(cur) {
+			cur = wi.Currency
+		}
+		res.Price, res.Currency, res.Availability = product.ToMinor(p.Price, currency.Decimals(cur)), cur, p.Availability
+	}
+	if res.Err == "" && res.Price <= 0 {
+		res.Err = "no price on the page any more"
+	}
+	if st.LookoutAuto && handOver(res) {
+		id, err := s.lookoutTakeOver(ctx, wi, st)
+		switch {
+		case err != nil:
+			s.log.Warn("pocket lookout: hand over", "wish", wi.ID, "err", err)
+		case id != nil:
+			if r2, ok := s.lookoutRead(ctx, wi); ok {
+				return r2
+			}
+		}
+	}
+	return res
 }

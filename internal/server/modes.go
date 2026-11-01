@@ -75,4 +75,4 @@ func (s *Server) reportModesSoon() {
 
 // modeKeys are the settings that can change a person's effective mode: the
 // mode itself, and the token (a saved token makes the default direct).
-var modeKeys = []string{"inventory_mode", "money_mode", "split_mode", "contacts_mode", "inventory_token", "money_token", "split_token", "contacts_token"}
+var modeKeys = []string{"inventory_mode", "money_mode", "split_mode", "contacts_mode", "lookout_mode", "inventory_token", "money_token", "split_token", "contacts_token", "lookout_token"}

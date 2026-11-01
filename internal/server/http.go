@@ -91,6 +91,8 @@ func (s *Server) Router() http.Handler {
 			r.Post("/wishes/{id}/bought", s.handleBought)
 			r.Post("/wishes/{id}/status", s.handleSetStatus)
 			r.Post("/wishes/{id}/check", s.handleCheckNow)
+			r.Post("/wishes/{id}/lookout", s.handleLookout)
+			r.Delete("/wishes/{id}/lookout", s.handleLookout)
 			r.Get("/wishes/{id}/prices", s.handlePrices)
 			r.Post("/wishes/{id}/hunt", s.handleHunt)
 			r.Get("/wishes/{id}/offers", s.handleOffers)

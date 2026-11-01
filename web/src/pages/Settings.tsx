@@ -19,7 +19,7 @@ const TABS: { id: TabId; label: string; icon: string; sub: string }[] = [
   { id: 'general', label: 'General', icon: 'settings', sub: 'Currency, price watching, what “Bought it” does by default, date formats and the app title.' },
   { id: 'deals', label: 'Deal hunting', icon: 'sparkles', sub: 'Which AI checks the offers, the search engine, and where you buy.' },
   { id: 'notifications', label: 'Notifications', icon: 'bell', sub: 'A push when a price drops, and a reminder before birthdays and other gift occasions.' },
-  { id: 'apps', label: 'Connected apps', icon: 'layers', sub: 'Pocket Inventory, Pocket Money, Pocket Split and Pocket Contacts — through Pocket Core or directly.' },
+  { id: 'apps', label: 'Connected apps', icon: 'layers', sub: 'Pocket Inventory, Money, Split, Contacts and Lookout — through Pocket Core or directly.' },
   { id: 'profile', label: 'Profile', icon: 'user', sub: 'Your name, email and password.' },
   { id: 'people', label: 'People', icon: 'users', sub: 'Everyone who has an account on this box.' },
   { id: 'tokens', label: 'API & shortcuts', icon: 'key', sub: 'Personal tokens for Homepage widgets, Siri Shortcuts and Raycast.' },
@@ -264,13 +264,13 @@ function Integrations() {
   // in the switches below, greyed out, and this explains why
   const coreOn = f.core_configured && f.core_registered !== false
   const eff = (m: ConnMode): ConnMode => !coreOn && m === 'core' ? 'off' : m
-  const direct = (app: 'inventory' | 'money' | 'split' | 'contacts', name: string, port: number) => (
+  const direct = (app: 'inventory' | 'money' | 'split' | 'contacts' | 'lookout', name: string, port: number) => (
     <div className="two-col tight">
       <Field label="URL" help="Inside Docker use http://host.docker.internal:PORT or the service name."><input value={f[`${app}_url`]} onChange={e => setF({ ...f, [`${app}_url`]: e.target.value })} placeholder={`http://host.docker.internal:${port}`} /></Field>
       <Field label="API token" help={`${name} → Settings → API tokens`}><input value={f[`${app}_token`]} onChange={e => setF({ ...f, [`${app}_token`]: e.target.value })} autoComplete="off" /></Field>
     </div>
   )
-  const conn = (app: 'inventory' | 'money' | 'split' | 'contacts', name: string, port: number) => (
+  const conn = (app: 'inventory' | 'money' | 'split' | 'contacts' | 'lookout', name: string, port: number) => (
     <Connection app={name} mode={f[`${app}_mode`]} via={f[`${app}_via`]} detail={f[`${app}_detail`]} core={coreOn} hasToken={!!f[`${app}_token`]}
       onMode={m => save({ [`${app}_mode`]: m })} onDisconnect={() => save({ [`${app}_url`]: '', [`${app}_token`]: '' })}
       test={<><button type="button" className="btn sm" onClick={() => run(app, f[`${app}_url`], f[`${app}_token`])}>Test connection</button>{status(app)}</>}
@@ -309,6 +309,14 @@ function Integrations() {
       <Section title="Pocket Contacts — who gifts are for" icon="user" actions={connBadge(eff(f.contacts_mode), f.contacts_via)}
         sub="Pick the person of a gift list from your contacts; their birthdays and anniversaries show up under Occasions and in the reminders.">
         {conn('contacts', 'Pocket Contacts', 8191)}
+      </Section>
+      <Section title="Pocket Lookout — prices of picky shops" icon="eye" actions={connBadge(eff(f.lookout_mode), f.lookout_via)}
+        sub="Some shops turn price checks away or only show the price with JavaScript. Pocket Lookout reads those pages with a real browser and Wishlist takes the price from there — history, target price and price-drop pushes work as usual. The watch goes when you buy or delete the wish.">
+        {conn('lookout', 'Pocket Lookout', 8224)}
+        {eff(f.lookout_mode) !== 'off' && <div className="mt">
+          <SettingRow title="Hand them over on their own" help="When a shop refuses a price check or shows no price, Wishlist starts a Lookout watch for that wish. Off: only when you ask on the wish."><Switch checked={f.lookout_auto} onChange={v => setF({ ...f, lookout_auto: v })} label="Hand picky shops to Pocket Lookout" /></SettingRow>
+          {f.lookout_mode === 'direct' && <SettingRow title="Public URL (optional)" help="What the browser opens for “Open in Pocket Lookout” when the URL above is internal." stack><input value={f.lookout_public_url} onChange={e => setF({ ...f, lookout_public_url: e.target.value })} placeholder="https://lookout.example.com" /></SettingRow>}
+        </div>}
       </Section>
       <div className="row"><button type="button" className="btn primary" onClick={() => save()} disabled={busy}>Save changes</button></div>
     </div>

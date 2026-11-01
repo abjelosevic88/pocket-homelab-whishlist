@@ -307,7 +307,7 @@ func (s *Server) handleUpdateWish(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "invalid json")
 		return
 	}
-	oldImage := wi.ImageURL
+	oldImage, oldURL := wi.ImageURL, wi.URL
 	if msg := in.apply(wi); msg != "" {
 		writeErr(w, http.StatusBadRequest, msg)
 		return
@@ -318,6 +318,9 @@ func (s *Server) handleUpdateWish(w http.ResponseWriter, r *http.Request) {
 	}
 	if wi.ImageURL != "" && wi.ImageURL != oldImage {
 		s.fetchPhoto(ctx, uid, wi.ID, wi.ImageURL)
+	}
+	if wi.URL != oldURL || !wi.TrackPrice {
+		s.lookoutDrop(ctx, uid, wi) // a new link is read plainly first; untracked prices need no watch
 	}
 	got, err := s.ownerWish(ctx, wi.ID)
 	if err != nil {
@@ -343,6 +346,7 @@ func (s *Server) handleDeleteWish(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err, "delete wish")
 		return
 	}
+	s.lookoutDrop(ctx, actorID(ctx), wi)
 	s.removeFile(photo)
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -377,6 +381,11 @@ func (s *Server) handleSetStatus(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeErr(w, http.StatusBadRequest, "status is wanted, bought or archived")
 		return
+	}
+	if in.Status != store.StatusWanted {
+		if wi, err := s.store.GetWish(ctx, actorID(ctx), idParam(r, "id")); err == nil {
+			s.lookoutDrop(ctx, actorID(ctx), wi)
+		}
 	}
 	got, err := s.ownerWish(ctx, idParam(r, "id"))
 	if err != nil {

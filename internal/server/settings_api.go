@@ -49,6 +49,7 @@ func (s *Server) publicSettings(ctx context.Context, u *store.User, st store.Set
 		"split_url": st.SplitURL, "split_token": mask(st.SplitToken), "split_public_url": st.SplitPublicURL, "split_group_id": st.SplitGroupID,
 		"split_member_id": st.SplitMemberID, "split_category": st.SplitCategory,
 		"contacts_url": st.ContactsURL, "contacts_token": mask(st.ContactsToken), "contacts_public_url": st.ContactsPublicURL,
+		"lookout_url": st.LookoutURL, "lookout_token": mask(st.LookoutToken), "lookout_public_url": st.LookoutPublicURL, "lookout_auto": st.LookoutAuto,
 		"bought_inventory": st.BoughtInventory, "bought_money": st.BoughtMoney,
 		"ai_provider": st.AIProvider, "ai_pocket_model": st.AIPocketModel, "openai_api_key": mask(st.OpenAIKey), "openai_model": st.OpenAIModel,
 		"openai_base_url": st.OpenAIBaseURL, "search_url": st.SearchURL, "search_default": s.cfg.SearchURL, "deal_markets": st.DealMarkets,
@@ -176,6 +177,10 @@ func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 	url("contacts_url", &cur.ContactsURL, in.ContactsURL)
 	secret("contacts_token", &cur.ContactsToken, in.ContactsToken)
 	url("contacts_public_url", &cur.ContactsPublicURL, in.ContactsPublicURL)
+	url("lookout_url", &cur.LookoutURL, in.LookoutURL)
+	secret("lookout_token", &cur.LookoutToken, in.LookoutToken)
+	url("lookout_public_url", &cur.LookoutPublicURL, in.LookoutPublicURL)
+	boolIn("lookout_auto", &cur.LookoutAuto, in.LookoutAuto)
 	if keys["ai_provider"] {
 		if !validAIProvider(in.AIProvider) {
 			writeErr(w, http.StatusBadRequest, "AI is automatic, Pocket AI or OpenAI")
@@ -217,6 +222,7 @@ func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 	mode("money_mode", &cur.MoneyMode, in.MoneyMode)
 	mode("split_mode", &cur.SplitMode, in.SplitMode)
 	mode("contacts_mode", &cur.ContactsMode, in.ContactsMode)
+	mode("lookout_mode", &cur.LookoutMode, in.LookoutMode)
 	if err := s.store.SaveUserSettings(r.Context(), me.ID, cur); err != nil {
 		s.fail(w, err, "save settings")
 		return
@@ -304,6 +310,10 @@ func (s *Server) handleIntegrationTest(w http.ResponseWriter, r *http.Request) {
 					var bs []pocket.Occasion
 					bs, err = conn.client.Birthdays(ctx, 60)
 					msg = fmt.Sprintf("Pocket Contacts %s, %s, %d birthdays in the next 60 days", v, how, len(bs))
+				case "lookout":
+					var ws []pocket.LookoutWatch
+					ws, err = conn.client.Watches(ctx)
+					msg = fmt.Sprintf("Pocket Lookout %s, %s, %d watched pages", v, how, len(ws))
 				}
 			}
 		}

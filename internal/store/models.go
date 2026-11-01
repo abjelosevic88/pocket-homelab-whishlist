@@ -104,6 +104,7 @@ type Wish struct {
 	SplitExpenseID  *int64 `json:"split_expense_id"`
 	SplitGroupID    *int64 `json:"split_group_id"`
 	HandoffNote     string `json:"handoff_note"`
+	LookoutWatchID  *int64 `json:"lookout_watch_id"` // Pocket Lookout reads the price
 	Source          string `json:"source"`
 	HuntQuery       string `json:"hunt_query"`
 	HuntMax         int64  `json:"hunt_max"`
@@ -252,6 +253,13 @@ type Settings struct {
 	ContactsURL       string `json:"contacts_url"`
 	ContactsToken     string `json:"contacts_token"`
 	ContactsPublicURL string `json:"contacts_public_url"`
+
+	// Pocket Lookout reads prices of shops that block robots or need JavaScript.
+	LookoutMode      string `json:"lookout_mode"`
+	LookoutURL       string `json:"lookout_url"`
+	LookoutToken     string `json:"lookout_token"`
+	LookoutPublicURL string `json:"lookout_public_url"`
+	LookoutAuto      bool   `json:"lookout_auto"` // hand such shops over on their own
 
 	// Deal hunting: who judges the offers (Pocket AI through Core, or an
 	// OpenAI-compatible API with the person's own key), where to search, and

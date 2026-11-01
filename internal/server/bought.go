@@ -171,6 +171,7 @@ func (s *Server) handleBought(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err, "bought")
 		return
 	}
+	s.lookoutDrop(ctx, uid, wi)
 	pending := false
 	if actionID != "" {
 		dctx, cancel := context.WithTimeout(ctx, 45*time.Second)

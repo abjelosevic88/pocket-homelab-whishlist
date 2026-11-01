@@ -31,6 +31,8 @@ const (
 	scopeGroupsRead    = "groups:read"
 	scopeExpensesWrite = "expenses:write"
 	scopeContactsRead  = "contacts:read"
+	scopeWatchesRead   = "watches:read"
+	scopeWatchesWrite  = "watches:write"
 )
 
 // pocketApp is one sibling Pocket app Wishlist acts in.
@@ -45,7 +47,8 @@ var (
 	appMoney     = pocketApp{"money", "Pocket Money", []string{scopeAccountsRead, scopeTxWrite}, "Book what a wish cost when you buy it"}
 	appSplit     = pocketApp{"split", "Pocket Split", []string{scopeGroupsRead, scopeExpensesWrite}, "Share a purchase or a group gift"}
 	appContacts  = pocketApp{"contacts", "Pocket Contacts", []string{scopeContactsRead}, "Gift ideas for your contacts, and their birthdays"}
-	pocketApps   = []pocketApp{appInventory, appMoney, appSplit, appContacts}
+	appLookout   = pocketApp{"lookout", "Pocket Lookout", []string{scopeWatchesRead, scopeWatchesWrite}, "Read the price of shops that block robots or need JavaScript"}
+	pocketApps   = []pocketApp{appInventory, appMoney, appSplit, appContacts, appLookout}
 )
 
 func appBySlug(slug string) (pocketApp, bool) {
@@ -137,6 +140,8 @@ func connSettings(st store.Settings, a pocketApp) (mode, url, token, public stri
 		return st.SplitMode, st.SplitURL, st.SplitToken, st.SplitPublicURL
 	case "contacts":
 		return st.ContactsMode, st.ContactsURL, st.ContactsToken, st.ContactsPublicURL
+	case "lookout":
+		return st.LookoutMode, st.LookoutURL, st.LookoutToken, st.LookoutPublicURL
 	}
 	return "", "", "", ""
 }

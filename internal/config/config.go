@@ -60,6 +60,8 @@ type Config struct {
 	SplitGroupID   int64
 	ContactsURL    string
 	ContactsToken  string
+	LookoutURL     string
+	LookoutToken   string
 
 	// Price checks: how many pages at most per sweep, and whether the
 	// fetcher may reach private addresses (a shop on your own network).
@@ -178,6 +180,8 @@ func Load() (*Config, error) {
 		SplitGroupID:      envInt64("SPLIT_GROUP_ID", 0),
 		ContactsURL:       strings.TrimRight(env("CONTACTS_URL", ""), "/"),
 		ContactsToken:     env("CONTACTS_TOKEN", ""),
+		LookoutURL:        strings.TrimRight(env("LOOKOUT_URL", ""), "/"),
+		LookoutToken:      env("LOOKOUT_TOKEN", ""),
 		PriceChecksPerRun: envInt("PRICE_CHECKS_PER_RUN", 40),
 		FetchPrivate:      envBool("FETCH_PRIVATE", false),
 		SearchURL:         strings.TrimRight(env("SEARXNG_URL", ""), "/"),

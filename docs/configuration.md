@@ -26,6 +26,7 @@ Everything is read from environment variables; every value has a default, so a b
 | `MONEY_URL` / `MONEY_TOKEN` | – | Pocket Money: “Bought it” books the expense |
 | `SPLIT_URL` / `SPLIT_TOKEN` / `SPLIT_PUBLIC_URL` / `SPLIT_GROUP_ID` | – | Pocket Split: shared purchases and group gifts (public URL = what the browser opens) |
 | `CONTACTS_URL` / `CONTACTS_TOKEN` | – | Pocket Contacts: gift recipients and their birthdays |
+| `LOOKOUT_URL` / `LOOKOUT_TOKEN` | – | [Pocket Lookout](https://github.com/abjelosevic88/pocket-homelab-lookout): reads the price of shops that refuse plain price checks or need JavaScript, with a headless browser (a `@price` watch per wish; Wishlist keeps its own history and alerts) |
 | `NOTIFY_URL` / `NOTIFY_FORMAT` | – / guessed | Apprise `…/notify/<key>`, ntfy topic URL or JSON webhook; `apprise`, `ntfy`, `json` |
 | `SEARXNG_URL` | – | The SearXNG that deal hunts search with (JSON format on: `formats: [html, json]`). Each person can set their own under Settings → Deal hunting |
 | `OPENAI_API_KEY` / `OPENAI_MODEL` / `OPENAI_BASE_URL` | – / `gpt-4o-mini` / OpenAI | The owner's own OpenAI-compatible AI for deal hunts (copied once). With Pocket Core, Pocket AI is used instead when the `inference:write` link is on |

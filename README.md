@@ -50,6 +50,7 @@
 - **Watch prices** — every watched page is read again on your schedule (12 h by default). The history is a chart on each wish; *Price drops* lists what is at your target; a push goes out once per drop (target reached, a drop of your percentage, back in stock).
 - **Wishlists and gift ideas** — your own lists, and lists for someone else with an occasion, a date (birthdays roll on every year), a budget and what you already bought.
 - **Share without spoiling** — a secret link (no account needed) or a person on the box. Givers reserve, see what is still free and tick what they bought; the owner sees at most that something is taken, never by whom.
+- **Picky shops** — when a shop turns price checks away or only shows the price with JavaScript, the page goes to Pocket Lookout, which reads it with a real browser; the price comes back into the wish with its history, target and drop alerts. On its own (Settings → Connected apps) or per wish.
 - **Bought it** — files the purchase in Pocket Inventory (item with price, date, shop and link), Pocket Money (an expense tagged `wishlist`, `gift` for gifts) and Pocket Split (evenly in a group), as a durable action that retries and never books twice.
 - **Occasions** — birthdays and anniversaries from Pocket Contacts next to your gift lists, with reminders 14, 7, 3 and 1 days before.
 - Per person: everyone has their own lists and connections; admins manage accounts, not content. Keyboard shortcuts, ⌘K, light/dark, phone layout, JSON export/import, Homepage widget endpoint.

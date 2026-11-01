@@ -35,6 +35,17 @@ export default function WishPage() {
     setChecking(true)
     try { const r = await api.post<{ wish: Wish; prices: PricePoint[]; error: string }>(`${V1}/wishes/${w.id}/check`); setData({ wish: r.wish, prices: r.prices }); toast(r.error ? `Checked: ${r.error}` : 'Price checked', r.error ? 'err' : 'ok'); announceChange() } catch (e) { toast((e as Error).message, 'err') } finally { setChecking(false) }
   }
+  // Pocket Lookout reads the price of shops that refuse plain checks (POST hands it over, DELETE takes it back)
+  const lookout = async (on: boolean) => {
+    setChecking(true)
+    try {
+      const r = await (on ? api.post : api.del)<{ wish: Wish; prices: PricePoint[]; error: string }>(`${V1}/wishes/${w.id}/lookout`)
+      setData({ wish: r.wish, prices: r.prices })
+      toast(on ? (r.error ? `Pocket Lookout: ${r.error}` : 'Pocket Lookout reads this price now') : 'Wishlist reads this price itself again', on && r.error ? 'err' : 'ok')
+      announceChange()
+    } catch (e) { toast((e as Error).message, 'err') } finally { setChecking(false) }
+  }
+  const lookoutReady = !!settings?.lookout_via
   const setPhoto = async (f: File) => { try { await upload(`${V1}/wishes/${w.id}/photo`, 'file', f); reload(); announceChange() } catch (e) { toast((e as Error).message, 'err') } }
   const gift = w.list_kind === 'gifts'
   const lowest = data.prices.filter(p => p.currency === w.currency).reduce((lo, p) => (lo === 0 || p.price < lo ? p.price : lo), 0)
@@ -95,7 +106,13 @@ export default function WishPage() {
                 {w.track_price ? <span><Icon name="eye" size={12} /> Watching the price{w.checked_at ? ` · checked ${ago(w.checked_at)}` : ''}{settings?.price_check_hours ? ` · every ${settings.price_check_hours} h` : ''}</span>
                   : <span>{w.url ? 'The price is not watched.' : 'Add a link to watch the price.'}</span>}
                 {w.check_error && <span className="bad" title={w.checked_at ? fmtDateTime(w.checked_at) : ''}>Last check: {w.check_error}</span>}
+                {w.lookout_watch_id && <span title="This shop refuses plain price checks or needs JavaScript; Pocket Lookout reads it with a browser">
+                  <Icon name="eye" size={12} /> Read by Pocket Lookout{settings?.lookout_open_url && <> · <a href={`${settings.lookout_open_url}/watches/${w.lookout_watch_id}`} target="_blank" rel="noreferrer">open</a></>}
+                </span>}
                 <span className="spacer" />
+                {w.url && w.lookout_watch_id && <button type="button" className="btn sm ghost" onClick={() => lookout(false)} disabled={checking} title="Stop the Lookout watch; Wishlist reads the shop page itself again">Read it here</button>}
+                {w.url && !w.lookout_watch_id && !!w.check_error && settings?.lookout_mode !== 'off' && <button type="button" className="btn sm" onClick={() => lookout(true)} disabled={checking || !lookoutReady}
+                  title={lookoutReady ? 'Pocket Lookout reads the page with a browser and Wishlist takes the price from there' : `Needs Pocket Lookout: ${settings?.lookout_detail || 'Settings → Connected apps'}`}><Icon name="eye" size={14} />Let Pocket Lookout read it</button>}
                 {w.url && <button type="button" className="btn sm" onClick={check} disabled={checking}>{checking ? <Spinner /> : <Icon name="refresh" size={14} />}Check now</button>}
                 {w.url && <button type="button" className="btn sm ghost" onClick={() => run(() => api.put(`${V1}/wishes/${w.id}`, { track_price: !w.track_price }), w.track_price ? 'No longer watched' : 'Watching the price')}>{w.track_price ? 'Stop watching' : 'Watch the price'}</button>}
               </div>

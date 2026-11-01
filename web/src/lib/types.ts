@@ -4,7 +4,7 @@ export interface Currency { code: string; name: string; decimals: number }
 
 export type ConnMode = 'core' | 'direct' | 'off'
 export type ConnVia = '' | 'core' | 'direct'
-export type AppSlug = 'inventory' | 'money' | 'split' | 'contacts'
+export type AppSlug = 'inventory' | 'money' | 'split' | 'contacts' | 'lookout'
 
 export interface Settings {
   core_configured: boolean
@@ -21,6 +21,8 @@ export interface Settings {
   split_url: string; split_token: string; split_public_url: string; split_group_id: number; split_member_id: number; split_category: string
   contacts_mode: ConnMode; contacts_via: ConnVia; contacts_detail: string; contacts_open_url: string
   contacts_url: string; contacts_token: string; contacts_public_url: string
+  lookout_mode: ConnMode; lookout_via: ConnVia; lookout_detail: string; lookout_open_url: string
+  lookout_url: string; lookout_token: string; lookout_public_url: string; lookout_auto: boolean
   bought_inventory: boolean; bought_money: boolean
   ai_provider: 'auto' | 'pocket' | 'openai'; ai_pocket_model: string; openai_api_key: string; openai_model: string; openai_base_url: string
   search_url: string; search_default: string; deal_markets: string; deal_abroad: boolean; hunt_every_days: number
@@ -45,6 +47,7 @@ export interface Wish {
   availability: '' | 'in_stock' | 'out_of_stock' | 'preorder'; checked_at: string; check_error: string; lowest_price: number
   bought_at: string; bought_price: number; bought_currency: string; bought_store: string
   inventory_item_id: number | null; money_tx_id: number | null; split_expense_id: number | null; split_group_id: number | null; handoff_note: string
+  lookout_watch_id: number | null
   source: string; sort_order: number; created_at: string; updated_at: string
   hunt_query: string; hunt_max: number; hunt_condition: 'new' | 'any'; hunt_auto: boolean; hunt_status: '' | 'running' | 'done' | 'error'
   hunt_step: string; hunt_at: string; hunt_summary: string; hunt_error: string; hunt_ai: '' | 'pocket' | 'openai'; hunt_best: number

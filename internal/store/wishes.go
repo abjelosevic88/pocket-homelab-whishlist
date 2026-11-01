@@ -13,7 +13,7 @@ const wishCols = `w.id, w.user_id, w.list_id, w.title, w.url, w.store, w.notes, 
 	w.priority, w.quantity, w.status, w.track_price, w.availability, w.checked_at, w.check_error, w.lowest_price, w.alerted_price,
 	w.bought_at, w.bought_price, w.bought_currency, w.bought_store, w.inventory_item_id, w.money_tx_id, w.split_expense_id, w.split_group_id,
 	w.handoff_note, w.source, w.hunt_query, w.hunt_max, w.hunt_condition, w.hunt_auto, w.hunt_status, w.hunt_step, w.hunt_at,
-	w.hunt_summary, w.hunt_error, w.hunt_ai, w.hunt_best, w.sort_order, w.created_at, w.updated_at,
+	w.hunt_summary, w.hunt_error, w.hunt_ai, w.hunt_best, w.sort_order, w.created_at, w.updated_at, w.lookout_watch_id,
 	l.name, l.kind, l.recipient,
 	COALESCE((SELECT p.price FROM price_history p WHERE p.wish_id = w.id AND p.currency = w.currency ORDER BY p.at, p.id LIMIT 1), 0),
 	(SELECT COALESCE(SUM(r.quantity), 0) FROM reservations r WHERE r.wish_id = w.id)`
@@ -22,20 +22,20 @@ const wishFrom = ` FROM wishes w JOIN lists l ON l.id = w.list_id `
 
 func scanWish(row interface{ Scan(...any) error }) (*Wish, error) {
 	var w Wish
-	var inv, tx, exp, grp sql.NullInt64
+	var inv, tx, exp, grp, look sql.NullInt64
 	var first int64
 	if err := row.Scan(&w.ID, &w.UserID, &w.ListID, &w.Title, &w.URL, &w.Store, &w.Notes, &w.Tags, &w.ImageURL, &w.PhotoPath, &w.Price, &w.Currency, &w.TargetPrice,
 		&w.Priority, &w.Quantity, &w.Status, &w.TrackPrice, &w.Availability, &w.CheckedAt, &w.CheckError, &w.LowestPrice, &w.AlertedPrice,
 		&w.BoughtAt, &w.BoughtPrice, &w.BoughtCurrency, &w.BoughtStore, &inv, &tx, &exp, &grp,
 		&w.HandoffNote, &w.Source, &w.HuntQuery, &w.HuntMax, &w.HuntCondition, &w.HuntAuto, &w.HuntStatus, &w.HuntStep, &w.HuntAt,
-		&w.HuntSummary, &w.HuntError, &w.HuntAI, &w.HuntBest, &w.SortOrder, &w.CreatedAt, &w.UpdatedAt,
+		&w.HuntSummary, &w.HuntError, &w.HuntAI, &w.HuntBest, &w.SortOrder, &w.CreatedAt, &w.UpdatedAt, &look,
 		&w.ListName, &w.ListKind, &w.Recipient, &first, &w.Reserved); err != nil {
 		return nil, notFound(err)
 	}
 	for _, p := range []struct {
 		v   sql.NullInt64
 		dst **int64
-	}{{inv, &w.InventoryItemID}, {tx, &w.MoneyTxID}, {exp, &w.SplitExpenseID}, {grp, &w.SplitGroupID}} {
+	}{{inv, &w.InventoryItemID}, {tx, &w.MoneyTxID}, {exp, &w.SplitExpenseID}, {grp, &w.SplitGroupID}, {look, &w.LookoutWatchID}} {
 		if p.v.Valid {
 			n := p.v.Int64
 			*p.dst = &n
@@ -452,4 +452,11 @@ func (s *Store) WishesOnDay(ctx context.Context, uid int64, day string) (added, 
 	}
 	bought, err = s.queryWishes(ctx, `WHERE w.user_id = ? AND w.status = 'bought' AND w.bought_at = ? ORDER BY w.updated_at`, uid, day)
 	return
+}
+
+// SetLookoutWatch records (or, with nil, forgets) the Pocket Lookout watch
+// that reads a wish's price.
+func (s *Store) SetLookoutWatch(ctx context.Context, uid, id int64, watch *int64) error {
+	_, err := s.DB.ExecContext(ctx, `UPDATE wishes SET lookout_watch_id = ? WHERE id = ? AND user_id = ?`, nullI(watch), id, uid)
+	return err
 }

@@ -154,6 +154,8 @@ func (s *Server) ownerReady(ctx context.Context, owner int64) error {
 	set("SplitPublicURL", &st.SplitPublicURL, s.cfg.SplitPublicURL)
 	set("ContactsURL", &st.ContactsURL, s.cfg.ContactsURL)
 	set("ContactsToken", &st.ContactsToken, s.cfg.ContactsToken)
+	set("LookoutURL", &st.LookoutURL, s.cfg.LookoutURL)
+	set("LookoutToken", &st.LookoutToken, s.cfg.LookoutToken)
 	set("OpenAIKey", &st.OpenAIKey, s.cfg.OpenAIKey)
 	set("OpenAIModel", &st.OpenAIModel, s.cfg.OpenAIModel)
 	set("OpenAIBaseURL", &st.OpenAIBaseURL, s.cfg.OpenAIBaseURL)
