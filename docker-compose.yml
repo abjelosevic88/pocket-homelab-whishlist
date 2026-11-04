@@ -1,4 +1,8 @@
-# Pocket Wishlist — self-hosted wishlists, gift ideas and price watching (Go + SQLite). One container, one volume.
+# Pocket Wishlist — self-hosted wishlists, gift ideas and price watching (Go + SQLite).
+# `docker compose up -d` starts the app and SearXNG, the meta-search engine deal hunting uses to find
+# offers across shops (Google, Bing, DuckDuckGo… at once, no API key). The engine has no port of its own:
+# only the app reaches it. Already run SearXNG (or Pocket Search)? Point SEARXNG_URL at it and delete
+# the engine service; its settings.yml needs `search.formats: [html, json]`.
 services:
   pocket-wishlist:
     image: ghcr.io/abjelosevic88/pocket-homelab-whishlist:latest
@@ -24,6 +28,8 @@ services:
       CONTACTS_URL: ${CONTACTS_URL:-}
       CONTACTS_TOKEN: ${CONTACTS_TOKEN:-}
       NOTIFY_URL: ${NOTIFY_URL:-}
+      # Deal hunting: the engine below (or your own SearXNG).
+      SEARXNG_URL: ${SEARXNG_URL:-http://engine:8080}
       # Pocket Core: one sign-in and app links instead of tokens.
       # CORE_URL: http://pocket-core:8080
       # CORE_REGISTRATION_KEY: ${CORE_REGISTRATION_KEY}
@@ -31,3 +37,69 @@ services:
       - ./data:/data
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    depends_on:
+      engine:
+        condition: service_started
+        required: false
+
+  # SearXNG, the official image: engine fixes arrive with every image update.
+  engine:
+    image: searxng/searxng:latest
+    container_name: pocket-wishlist-engine
+    restart: unless-stopped
+    environment:
+      SEARXNG_SETTINGS_PATH: /pocket/settings.yml
+      # Signs SearXNG's own cookies; the engine is private to the app, but a
+      # value of your own does not hurt.
+      SEARXNG_SECRET: ${ENGINE_SECRET:-pocket-wishlist-private-engine}
+      # two processes: a search, the AI answer's and a hovered tab's no longer queue behind each other
+      GRANIAN_WORKERS: "2"
+    configs:
+      - source: engine-settings
+        target: /pocket/settings.yml
+    cap_drop: [ALL]
+    cap_add: [CHOWN, SETGID, SETUID, DAC_OVERRIDE]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO /dev/null http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+configs:
+  engine-settings:
+    content: |
+      # Only what differs from SearXNG's defaults: new and fixed engines keep
+      # arriving with the image.
+      use_default_settings: true
+      general:
+        instance_name: "Pocket Wishlist engine"
+        donation_url: false
+        contact_url: false
+        privacypolicy_url: false
+        enable_metrics: false
+      server:
+        limiter: false          # only Pocket Wishlist asks it
+        public_instance: false
+        image_proxy: false      # Pocket Wishlist reads pages itself
+        method: "GET"
+      search:
+        safe_search: 1
+        autocomplete: "duckduckgo"
+        default_lang: "auto"
+        formats: [html, json]
+      outgoing:
+        # a page waits for its slowest engine: none may hold it longer than this
+        request_timeout: 2.0
+        max_request_timeout: 10.0
+        pool_connections: 100
+        pool_maxsize: 20
+      engines:
+        # answers in 3-5 s and holds every video search up; people can switch it on in Settings → Engines
+        - name: vimeo
+          disabled: true
+        # a miss (most searches) often takes 2-3 s; the infobox is not worth the wait
+        - name: wikipedia
+          timeout: 1.2
+        - name: wikidata
+          timeout: 1.2

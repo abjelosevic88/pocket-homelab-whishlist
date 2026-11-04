@@ -28,7 +28,7 @@ Everything is read from environment variables; every value has a default, so a b
 | `CONTACTS_URL` / `CONTACTS_TOKEN` | – | Pocket Contacts: gift recipients and their birthdays |
 | `LOOKOUT_URL` / `LOOKOUT_TOKEN` | – | [Pocket Lookout](https://github.com/abjelosevic88/pocket-homelab-lookout): reads the price of shops that refuse plain price checks or need JavaScript, with a headless browser (a `@price` watch per wish; Wishlist keeps its own history and alerts) |
 | `NOTIFY_URL` / `NOTIFY_FORMAT` | – / guessed | Apprise `…/notify/<key>`, ntfy topic URL or JSON webhook; `apprise`, `ntfy`, `json` |
-| `SEARXNG_URL` | – | The SearXNG that deal hunts search with (JSON format on: `formats: [html, json]`). Each person can set their own under Settings → Deal hunting |
+| `SEARXNG_URL` | – (`http://engine:8080` in the sample compose file, which brings SearXNG along) | The SearXNG that deal hunts search with (JSON format on: `formats: [html, json]`). Each person can set their own under Settings → Deal hunting |
 | `OPENAI_API_KEY` / `OPENAI_MODEL` / `OPENAI_BASE_URL` | – / `gpt-4o-mini` / OpenAI | The owner's own OpenAI-compatible AI for deal hunts (copied once). With Pocket Core, Pocket AI is used instead when the `inference:write` link is on |
 | `DELIVER_TO` | – | The country people start out with under Settings → Deal hunting → Deliver to (ISO code, e.g. `BA`); hunts check every shop delivers there |
 | `DEAL_MARKETS` | – | Where people start out shopping (“Bosnia and Herzegovina, Germany”): the AI searches in those languages |

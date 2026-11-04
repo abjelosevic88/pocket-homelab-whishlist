@@ -1,6 +1,6 @@
 <p align="center"><img src="web/public/favicon.svg" width="72" alt=""></p>
 <h1 align="center">Pocket Wishlist</h1>
-<p align="center">Self-hosted wishlists and gift ideas. Paste a link to anything in any shop: the name, picture and price are read from the page, the price is watched, and you get a push when it reaches your target. Share a list with family so they can say “I’ll get this” — nobody buys the same present twice and you never see who got what. Collect gift ideas for the people you buy for, with their birthdays from Pocket Contacts. When you buy something, it goes into your Pocket Inventory, Pocket Money and, for a shared purchase or a group gift, Pocket Split.<br>One Go binary, one SQLite file, one volume. Part of the Pocket apps; works on its own too.</p>
+<p align="center">Self-hosted wishlists and gift ideas. Paste a link to anything in any shop: the name, picture and price are read from the page, the price is watched, and you get a push when it reaches your target. Share a list with family so they can say “I’ll get this” — nobody buys the same present twice and you never see who got what. Collect gift ideas for the people you buy for, with their birthdays from Pocket Contacts. When you buy something, it goes into your Pocket Inventory, Pocket Money and, for a shared purchase or a group gift, Pocket Split.<br>Comes with its own search engine for deal hunting. Part of the Pocket apps; works on its own too.</p>
 <p align="center">
   <a href="https://github.com/abjelosevic88/pocket-homelab-whishlist/actions"><img src="https://github.com/abjelosevic88/pocket-homelab-whishlist/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
   <a href="https://github.com/abjelosevic88/pocket-homelab-whishlist/pkgs/container/pocket-homelab-whishlist"><img src="https://img.shields.io/badge/ghcr.io-amd64%20%7C%20arm64%20%7C%20armv7-blue" alt="image"></a>
@@ -45,7 +45,7 @@
 
 ## What it does
 
-- **Find the best deal** — say what you want (“Sony WH-1000XM5, black, new, under 300”). Wishlist plans the searches (with Pocket AI or your own OpenAI key: the exact product name and model number, in the languages of the countries you buy from), searches through your SearXNG, reads every shop page it finds, and keeps only offers for exactly that item — not a case, not the older model. Every price shown was on the shop page or in the search result; anything else the AI says is dropped. Pick the country it must be delivered to and every shop is checked — its shipping data, its shipping page, what the page says — so shops that don't deliver there are left out and shipping costs count. Offers are ranked in your currency; the best becomes the wish's link and its price is watched. “Keep hunting” runs it again every week and pushes when it gets clearly cheaper. Without an AI it still works, matching by keywords.
+- **Find the best deal** — say what you want (“Sony WH-1000XM5, black, new, under 300”). Wishlist plans the searches (with Pocket AI or your own OpenAI key: the exact product name and model number, in the languages of the countries you buy from), searches through the SearXNG that comes with it (or yours), reads every shop page it finds, and keeps only offers for exactly that item — not a case, not the older model. Every price shown was on the shop page or in the search result; anything else the AI says is dropped. Pick the country it must be delivered to and every shop is checked — its shipping data, its shipping page, what the page says — so shops that don't deliver there are left out and shipping costs count. Offers are ranked in your currency; the best becomes the wish's link and its price is watched. “Keep hunting” runs it again every week and pushes when it gets clearly cheaper. Without an AI it still works, matching by keywords.
 - **Add from a link** — schema.org Product data and Open Graph tags give the title, picture, price, currency and stock. A bookmarklet, `/add?url=…` for iOS Shortcuts and the PWA share target add from anywhere. Pictures are stored locally.
 - **Watch prices** — every watched page is read again on your schedule (12 h by default). The history is a chart on each wish; *Price drops* lists what is at your target; a push goes out once per drop (target reached, a drop of your percentage, back in stock).
 - **Wishlists and gift ideas** — your own lists, and lists for someone else with an occasion, a date (birthdays roll on every year), a budget and what you already bought.
@@ -57,13 +57,24 @@
 
 ## Run it
 
+With Pocket Core: **Apps → Install app → Pocket Wishlist**. Or with [docker-compose.yml](docker-compose.yml):
+
+```sh
+docker compose up -d
+```
+
+That starts the app and [SearXNG](https://github.com/searxng/searxng), the search engine deal hunts use (no port of its
+own, no API key). Already run SearXNG or Pocket Search? Set `SEARXNG_URL` to it and delete the `engine` service.
+
+Or as a single container (deal hunting then needs `SEARXNG_URL`):
+
 ```sh
 docker run -d --name pocket-wishlist -p 8080:8080 -v ./data:/data \
   -e BASE_URL=https://wishlist.example.com -e SECURE_COOKIES=true \
   ghcr.io/abjelosevic88/pocket-homelab-whishlist:latest
 ```
 
-or `docker compose up -d` with [docker-compose.yml](docker-compose.yml). Open it, create the first account, paste a link. All options: [docs/configuration.md](docs/configuration.md). API: [docs/api.md](docs/api.md).
+Open it, create the first account, paste a link. All options: [docs/configuration.md](docs/configuration.md). API: [docs/api.md](docs/api.md).
 
 ## With Pocket Core
 
