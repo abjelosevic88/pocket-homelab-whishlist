@@ -21,7 +21,7 @@ import (
 
 var linkOffers = []core.Offer{
 	{Scope: "wishes:read", Name: "See your wishlists", Description: "Read your lists and wishes (titles, prices, price drops, what you bought) and upcoming gift occasions, for your journal, calendar and dashboards. Never who reserved a gift for you."},
-	{Scope: "wishes:write", Name: "Add wishes", Description: "Add things to your wishlists (e.g. from a shop page or a chat), and change or delete only the wishes that app added itself."},
+	{Scope: "wishes:write", Name: "Add wishes", Description: "Add things to your wishlists (e.g. from a shop page or a chat), mark a wish bought when you order it (Pocket Parcels), and change or delete only the wishes that app added itself."},
 }
 
 type linkRoute struct {
@@ -39,6 +39,9 @@ var linkRoutes = []linkRoute{
 	{"POST", regexp.MustCompile(`^/api/v1/wishes$`), "wishes:write"},
 	{"POST", regexp.MustCompile(`^/api/v1/preview$`), "wishes:write"},
 	{"PUT DELETE", regexp.MustCompile(`^/api/v1/wishes/\d+$`), "wishes:write"},
+	// Pocket Parcels marks the wish a parcel is as bought when it is ordered;
+	// any of the person's own wishes (bought once: a second time is a 409)
+	{"POST", regexp.MustCompile(`^/api/v1/wishes/\d+/bought$`), "wishes:write"},
 }
 
 var errLinkScope = errors.New("outside the link's scope")

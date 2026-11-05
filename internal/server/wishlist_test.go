@@ -441,7 +441,7 @@ func TestCoreLinkScopes(t *testing.T) {
 	t.Cleanup(coreSrv.Close)
 	a := newApp(t, func(c *config.Config) { c.CoreURL = coreSrv.URL })
 	mineID := num(a.ok(a.bob, "POST", "/api/v1/wishes", map[string]any{"title": "Bob's own"}), "id")
-	a.ok(a.alice, "POST", "/api/v1/wishes", map[string]any{"title": "Alice's"})
+	alicesID := num(a.ok(a.alice, "POST", "/api/v1/wishes", map[string]any{"title": "Alice's"}), "id")
 	_, _, ws := a.call("pcx_read", "GET", "/api/v1/wishes", nil)
 	if len(ws) != 1 || ws[0].(map[string]any)["title"] != "Bob's own" {
 		t.Fatalf("read link sees %v", ws)
@@ -458,6 +458,14 @@ func TestCoreLinkScopes(t *testing.T) {
 	a.expect(403, "pcx_write", "PUT", fmt.Sprintf("/api/v1/wishes/%d", mineID), map[string]any{"title": "hijacked"})
 	a.expect(403, "pcx_write", "DELETE", fmt.Sprintf("/api/v1/wishes/%d", mineID), nil)
 	a.expect(204, "pcx_write", "DELETE", fmt.Sprintf("/api/v1/wishes/%d", num(added, "id")), nil)
+	// marking a wish bought (Pocket Parcels when the order ships): any of the person's own wishes, once
+	a.expect(403, "pcx_read", "POST", fmt.Sprintf("/api/v1/wishes/%d/bought", mineID), map[string]any{"date": "2026-11-05"})
+	a.expect(404, "pcx_write", "POST", fmt.Sprintf("/api/v1/wishes/%d/bought", alicesID), map[string]any{"date": "2026-11-05"})
+	bought := a.expect(200, "pcx_write", "POST", fmt.Sprintf("/api/v1/wishes/%d/bought", mineID), map[string]any{"date": "2026-11-05", "store": "AliExpress", "inventory": false, "money": false})
+	if w := bought["wish"].(map[string]any); w["status"] != "bought" || w["bought_store"] != "AliExpress" {
+		t.Fatalf("bought through the link: %v", w)
+	}
+	a.expect(409, "pcx_write", "POST", fmt.Sprintf("/api/v1/wishes/%d/bought", mineID), map[string]any{"date": "2026-11-05"})
 }
 
 // Export and import stay with the person doing them.

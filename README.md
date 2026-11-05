@@ -78,7 +78,7 @@ Open it, create the first account, paste a link. All options: [docs/configuratio
 
 ## With Pocket Core
 
-Set `CORE_URL` and `CORE_REGISTRATION_KEY` and Wishlist joins the box: people sign in with Pocket Core, phones paired with Core work right away, and Wishlist acts in each person's own Inventory, Money, Split and Contacts through app links — nothing to paste. Other Pocket apps can read wishlists (`wishes:read`, e.g. Pocket Day) or add wishes (`wishes:write`). Without Core every connection can be made directly with a URL and an API token; the Core-only choices stay visible, greyed out.
+Set `CORE_URL` and `CORE_REGISTRATION_KEY` and Wishlist joins the box: people sign in with Pocket Core, phones paired with Core work right away, and Wishlist acts in each person's own Inventory, Money, Split and Contacts through app links — nothing to paste. Other Pocket apps can read wishlists (`wishes:read`, e.g. Pocket Day) or add wishes and mark one bought (`wishes:write`, e.g. Pocket Parcels when the order ships). Without Core every connection can be made directly with a URL and an API token; the Core-only choices stay visible, greyed out.
 
 ## Develop
 

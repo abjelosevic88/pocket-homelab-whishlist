@@ -77,7 +77,7 @@ A list owner never sees who reserved what — only, when the list has `show_rese
 Wishlist offers two scopes to other Pocket apps (Core → Links):
 
 - `wishes:read` — `GET /lists`, `/lists/{id}`, `/wishes`, `/wishes/{id}`, `/wishes/{id}/prices|photo`, `/dashboard`, `/occasions`, `/tags`, `/day/{date}`. Only the person's own lists; never lists shared with them, never reservations.
-- `wishes:write` — `POST /wishes` (and `/preview`), `PUT`/`DELETE /wishes/{id}` **only for wishes that app added** (their `source` is its slug).
+- `wishes:write` — `POST /wishes` (and `/preview`), `PUT`/`DELETE /wishes/{id}` **only for wishes that app added** (their `source` is its slug), and `POST /wishes/{id}/bought` for any of the person's wishes (Pocket Parcels marks the wish a parcel is as bought when it is ordered; a wish already bought answers 409).
 
 Every other route answers `403` to a link token. Wishlist itself uses `inference:write` in Pocket AI (deal hunts), `items:read`/`items:write` in Inventory, `accounts:read`/`transactions:write` in Money, `groups:read`/`expenses:write` in Split and `contacts:read` in Contacts.
 
