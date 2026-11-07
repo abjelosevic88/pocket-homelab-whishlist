@@ -1,4 +1,5 @@
 // A wish as a card, its price chart and the priority stars.
+import { useCallback, useRef, useState } from 'react'
 import { useApp } from '../lib/app-context'
 import { decimalsOf, fmtDate, fmtMoney } from '../lib/format'
 import { changePct, PRIORITY, type PricePoint, type Wish } from '../lib/types'
@@ -75,12 +76,29 @@ export function WishCard({ w, onOpen, viewer, showList }: { w: Wish; onOpen: () 
   )
 }
 
+/** The element's real width, so a chart draws 1:1 and its text, dots and corners keep their shape. */
+function useWidth(fallback: number) {
+  const [w, setW] = useState(fallback)
+  const ro = useRef<ResizeObserver | null>(null)
+  const ref = useCallback((el: Element | null) => {
+    ro.current?.disconnect()
+    ro.current = null
+    if (!el) return
+    const measure = () => { const cw = Math.round(el.getBoundingClientRect().width); if (cw > 0) setW(cw) }
+    measure()
+    ro.current = new ResizeObserver(measure)
+    ro.current.observe(el)
+  }, [])
+  return [ref, w] as const
+}
+
 /** The price history as a small line chart, with the target as a dashed line. */
 export function PriceChart({ points, target, currency }: { points: PricePoint[]; target: number; currency: string }) {
   const money = useMoney()
+  const [ref, W] = useWidth(600)
   const pts = points.filter(p => p.currency === currency || !p.currency)
   if (pts.length < 2) return <p className="muted small">The chart appears once the price has been checked a few times.</p>
-  const W = 600, H = 140, pad = { l: 8, r: 8, t: 12, b: 20 }
+  const H = 140, pad = { l: 8, r: 8, t: 12, b: 20 }
   const t0 = new Date(pts[0].at).getTime(), t1 = new Date(pts[pts.length - 1].at).getTime() || t0 + 1
   const prices = pts.map(p => p.price).concat(target > 0 ? [target] : [])
   let lo = Math.min(...prices), hi = Math.max(...prices)
@@ -97,7 +115,7 @@ export function PriceChart({ points, target, currency }: { points: PricePoint[];
   const area = `${d}V${H - pad.b}H${pad.l}Z`
   const low = Math.min(...pts.map(p => p.price))
   return (
-    <svg className="chart" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label={`Price history, lowest ${money(low, currency)}`}>
+    <svg ref={ref} className="chart" viewBox={`0 0 ${W} ${H}`} width={W} height={H} role="img" aria-label={`Price history, lowest ${money(low, currency)}`}>
       <path className="area" d={area} />
       {target > 0 && <line className="target" x1={pad.l} x2={W - pad.r} y1={y(target)} y2={y(target)} />}
       <path className="line" d={d} vectorEffect="non-scaling-stroke" />
