@@ -588,8 +588,11 @@ func (s *Server) handleImportJSON(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := r.Context()
 	uid := actorID(ctx)
-	counts := map[string]int{}
+	counts := map[string]int{"lists": 0, "wishes": 0}
+	// Archived lists count too, so a second run of the same file adds nothing.
 	existing, _ := s.store.ListLists(ctx, uid, false)
+	archived, _ := s.store.ListLists(ctx, uid, true)
+	existing = append(existing, archived...)
 	key := func(l store.List) string { return l.Kind + "\x00" + strings.ToLower(l.Name) }
 	byKey := map[string]int64{}
 	for _, l := range existing {
@@ -613,6 +616,10 @@ func (s *Server) handleImportJSON(w http.ResponseWriter, r *http.Request) {
 	}
 	have := map[string]bool{}
 	mine, _ := s.store.ListWishes(ctx, uid, store.WishFilter{Status: "all"})
+	for _, l := range archived {
+		ws, _ := s.store.ListWishes(ctx, uid, store.WishFilter{Status: "all", ListID: l.ID})
+		mine = append(mine, ws...)
+	}
 	for _, wi := range mine {
 		have[fmt.Sprintf("%d\x00%s", wi.ListID, strings.ToLower(wi.Title))] = true
 	}

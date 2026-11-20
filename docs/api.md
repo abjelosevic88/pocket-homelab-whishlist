@@ -78,6 +78,7 @@ Wishlist offers two scopes to other Pocket apps (Core → Links):
 
 - `wishes:read` — `GET /lists`, `/lists/{id}`, `/wishes`, `/wishes/{id}`, `/wishes/{id}/prices|photo`, `/dashboard`, `/occasions`, `/tags`, `/day/{date}`. Only the person's own lists; never lists shared with them, never reservations.
 - `wishes:write` — `POST /wishes` (and `/preview`), `PUT`/`DELETE /wishes/{id}` **only for wishes that app added** (their `source` is its slug), and `POST /wishes/{id}/bought` for any of the person's wishes (Pocket Parcels marks the wish a parcel is as bought when it is ordered; a wish already bought answers 409).
+- `move:export` / `move:import` — Pocket Move can copy your wishlists out and bring them in: `GET /export.json` out, `POST /import` in (adds; lists with the same name are merged, wishes you have are skipped, so a second run adds nothing). `GET /pocket/portable` describes both.
 
 Every other route answers `403` to a link token. Wishlist itself uses `inference:write` in Pocket AI (deal hunts), `items:read`/`items:write` in Inventory, `accounts:read`/`transactions:write` in Money, `groups:read`/`expenses:write` in Split and `contacts:read` in Contacts.
 
