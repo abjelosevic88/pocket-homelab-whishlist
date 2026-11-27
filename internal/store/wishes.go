@@ -454,6 +454,124 @@ func (s *Store) WishesOnDay(ctx context.Context, uid int64, day string) (added, 
 	return
 }
 
+// PriceMove is a wish whose price was another one at the end of a stretch of
+// time than before it.
+type PriceMove struct {
+	Wish     Wish
+	At       string // when the newest price was seen
+	From, To int64  // minor units of Currency
+	Currency string
+}
+
+// dayRows caps what one day returns (the day's readers show at most 200 lines).
+const dayRows = 200
+
+// WishesOfDay is WishesOnDay for a person's own local day, plus the prices
+// that moved: the wishes added between two moments (UTC without the zone
+// letter, so "…:00Z" and "…:00.123Z" both sort after the bound), the ones
+// bought on the date, and the wishes that were there before and ended the day
+// at another price than they started it with. A watched price is written
+// down once a day even when nothing changed, so a row in the history alone is
+// not a change.
+func (s *Store) WishesOfDay(ctx context.Context, uid int64, day, from, to string) (added, bought []Wish, moved []PriceMove, err error) {
+	added, err = s.queryWishes(ctx, `WHERE w.user_id = ? AND w.created_at >= ? AND w.created_at < ? ORDER BY w.created_at, w.id LIMIT ?`, uid, from, to, dayRows)
+	if err != nil {
+		return
+	}
+	bought, err = s.queryWishes(ctx, `WHERE w.user_id = ? AND w.status = 'bought' AND w.bought_at = ? ORDER BY w.updated_at, w.id LIMIT ?`, uid, day, dayRows)
+	if err != nil {
+		return
+	}
+	rows, err := s.DB.QueryContext(ctx, `SELECT p.wish_id, p.at, p.price, p.currency,
+		COALESCE((SELECT q.price FROM price_history q WHERE q.wish_id = p.wish_id AND q.id < p.id ORDER BY q.id DESC LIMIT 1), 0),
+		COALESCE((SELECT q.currency FROM price_history q WHERE q.wish_id = p.wish_id AND q.id < p.id ORDER BY q.id DESC LIMIT 1), '')
+		FROM price_history p JOIN wishes w ON w.id = p.wish_id
+		WHERE w.user_id = ? AND w.created_at < ? AND p.at >= ? AND p.at < ? ORDER BY p.wish_id, p.id`, uid, from, from, to)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+	var order []int64
+	byWish := map[int64]*PriceMove{}
+	for rows.Next() {
+		var id, price, before int64
+		var at, cur, beforeCur string
+		if err = rows.Scan(&id, &at, &price, &cur, &before, &beforeCur); err != nil {
+			return
+		}
+		m := byWish[id]
+		if m == nil {
+			// the day's first row: what came before it is where the day started
+			m = &PriceMove{From: before, Currency: beforeCur}
+			byWish[id] = m
+			order = append(order, id)
+		}
+		m.At, m.To = at, price
+		if cur != m.Currency {
+			m.From, m.Currency = 0, cur // another currency: nothing to compare with
+		}
+	}
+	if err = rows.Err(); err != nil {
+		return
+	}
+	rows.Close() // the store may have one connection: free it before reading the wishes
+	for _, id := range order {
+		m := byWish[id]
+		if m.From <= 0 || m.To <= 0 || m.From == m.To {
+			continue
+		}
+		w, gerr := s.GetWish(ctx, uid, id)
+		if gerr != nil {
+			continue
+		}
+		m.Wish = *w
+		moved = append(moved, *m)
+		if len(moved) == dayRows {
+			break
+		}
+	}
+	return
+}
+
+// likeWord makes a word safe inside LIKE … ESCAPE '\': % and _ are letters.
+var likeWord = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+
+// SearchWishes finds a person's own wishes that have every word somewhere in
+// what ListWishes searches (title, notes, shop, tags, who a gift is for), in
+// every state: what is still wanted first, then what was bought, then what
+// was put away; a title that has the words before the rest, the newest first.
+func (s *Store) SearchWishes(ctx context.Context, uid int64, words []string, limit int) ([]Wish, error) {
+	if len(words) == 0 {
+		return []Wish{}, nil
+	}
+	args := []any{uid}
+	var every, title []string
+	for _, w := range words {
+		like := "%" + likeWord.Replace(w) + "%"
+		every = append(every, `(w.title LIKE ? ESCAPE '\' OR w.notes LIKE ? ESCAPE '\' OR w.store LIKE ? ESCAPE '\' OR w.tags LIKE ? ESCAPE '\' OR l.recipient LIKE ? ESCAPE '\')`)
+		args = append(args, like, like, like, like, like)
+	}
+	for _, w := range words {
+		title = append(title, `w.title LIKE ? ESCAPE '\'`)
+		args = append(args, "%"+likeWord.Replace(w)+"%")
+	}
+	args = append(args, limit)
+	return s.queryWishes(ctx, `WHERE w.user_id = ? AND `+strings.Join(every, " AND ")+`
+		ORDER BY CASE w.status WHEN 'wanted' THEN 0 WHEN 'bought' THEN 1 ELSE 2 END, l.archived, (`+strings.Join(title, " AND ")+`) DESC, w.created_at DESC, w.id DESC LIMIT ?`, args...)
+}
+
+// WishTotals counts what a person still wants, as the dashboard does (wanted
+// wishes on lists that are not archived): how many, how many of them are at
+// or below their target price, and what they cost together in the home
+// currency (other currencies are left out).
+func (s *Store) WishTotals(ctx context.Context, uid int64, home string) (wanted, drops int, value int64, err error) {
+	err = s.DB.QueryRowContext(ctx, `SELECT COUNT(*),
+		COALESCE(SUM(CASE WHEN w.target_price > 0 AND w.price > 0 AND w.price <= w.target_price THEN 1 ELSE 0 END), 0),
+		COALESCE(SUM(CASE WHEN w.currency = ? OR w.currency = '' THEN w.price * MAX(w.quantity, 1) ELSE 0 END), 0)
+		FROM wishes w JOIN lists l ON l.id = w.list_id WHERE w.user_id = ? AND w.status = 'wanted' AND l.archived = 0`, home, uid).Scan(&wanted, &drops, &value)
+	return
+}
+
 // SetLookoutWatch records (or, with nil, forgets) the Pocket Lookout watch
 // that reads a wish's price.
 func (s *Store) SetLookoutWatch(ctx context.Context, uid, id int64, watch *int64) error {

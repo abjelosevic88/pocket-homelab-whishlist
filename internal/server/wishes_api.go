@@ -230,23 +230,25 @@ func (s *Server) wishEvent(ctx context.Context, topic string, wi *store.Wish, ex
 	}
 }
 
-func (s *Server) handleCreateWish(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	uid := actorID(ctx)
-	var in wishInput
-	if _, err := decodeKeys(r, &in); err != nil {
-		writeErr(w, http.StatusBadRequest, "invalid json")
-		return
+// readPage reads the shop page behind a new wish's link when something is
+// left to learn from it: a link alone is enough for a wish (name, picture
+// and price come from the page). nil = nothing was read.
+func (s *Server) readPage(ctx context.Context, in wishInput) *product.Product {
+	if in.URL == nil || strings.TrimSpace(*in.URL) == "" || in.NoLookup || (in.Title != nil && in.Price != nil && in.ImageURL != nil) {
+		return nil
 	}
+	pctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+	page, _ := s.fetch.Fetch(pctx, strings.TrimSpace(*in.URL))
+	return page
+}
+
+// newWish builds the wish POST /wishes and a quick line from elsewhere make:
+// what the page said, then what was sent, on the person's default list when
+// none was named. msg is what the person has to put right (a 400).
+func (s *Server) newWish(ctx context.Context, uid int64, in wishInput, page *product.Product) (wi *store.Wish, msg string, err error) {
 	st, _ := s.store.GetSettings(ctx, uid)
-	wi := &store.Wish{Priority: 2, Quantity: 1, Currency: st.HomeCurrency, Source: linkApp(ctx)}
-	// a link alone is enough: read the page for name, picture and price
-	var page *product.Product
-	if in.URL != nil && strings.TrimSpace(*in.URL) != "" && !in.NoLookup && (in.Title == nil || in.Price == nil || in.ImageURL == nil) {
-		pctx, cancel := context.WithTimeout(ctx, 20*time.Second)
-		page, _ = s.fetch.Fetch(pctx, strings.TrimSpace(*in.URL))
-		cancel()
-	}
+	wi = &store.Wish{Priority: 2, Quantity: 1, Currency: st.HomeCurrency, Source: linkApp(ctx)}
 	if page != nil {
 		wi.Title, wi.ImageURL, wi.Store, wi.Availability = page.Title, page.Image, page.Store, page.Availability
 		if page.Currency != "" && currency.Valid(page.Currency) {
@@ -258,18 +260,41 @@ func (s *Server) handleCreateWish(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if msg := in.apply(wi); msg != "" {
-		writeErr(w, http.StatusBadRequest, msg)
-		return
+		return nil, msg, nil
 	}
 	if wi.ListID == 0 {
 		id, err := s.defaultList(ctx, uid)
 		if err != nil {
-			s.fail(w, err, "create wish")
-			return
+			return nil, "", err
 		}
 		wi.ListID = id
 	}
-	if err := s.store.CreateWish(ctx, uid, wi, s.wishEvent(ctx, "wishlist.wish_added", wi, nil)); err != nil {
+	return wi, "", nil
+}
+
+// saveWish stores a new wish and tells the Core bus; the hooks commit with it.
+func (s *Server) saveWish(ctx context.Context, uid int64, wi *store.Wish, after ...core.CommitHook) error {
+	return s.store.CreateWish(ctx, uid, wi, append([]core.CommitHook{s.wishEvent(ctx, "wishlist.wish_added", wi, nil)}, after...)...)
+}
+
+func (s *Server) handleCreateWish(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	uid := actorID(ctx)
+	var in wishInput
+	if _, err := decodeKeys(r, &in); err != nil {
+		writeErr(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	wi, msg, err := s.newWish(ctx, uid, in, s.readPage(ctx, in))
+	if msg != "" {
+		writeErr(w, http.StatusBadRequest, msg)
+		return
+	}
+	if err != nil {
+		s.fail(w, err, "create wish")
+		return
+	}
+	if err := s.saveWish(ctx, uid, wi); err != nil {
 		s.fail(w, err, "create wish")
 		return
 	}

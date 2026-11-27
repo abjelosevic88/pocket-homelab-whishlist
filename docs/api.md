@@ -82,6 +82,17 @@ Wishlist offers two scopes to other Pocket apps (Core → Links):
 
 Every other route answers `403` to a link token. Wishlist itself uses `inference:write` in Pocket AI (deal hunts), `items:read`/`items:write` in Inventory, `accounts:read`/`transactions:write` in Money, `groups:read`/`expenses:write` in Split and `contacts:read` in Contacts.
 
+## Pocket Search, Pocket Day and Pocket Hub
+
+Wishlist answers the four routes every Pocket app can offer (`docs/capabilities.md` in Pocket Core), so Pocket Search, Pocket Day and Pocket Hub find it on their own. Each has its own link scope that opens that one route and nothing else (`wishes:read` and `wishes:write` do not open them); a signed-in person or a personal token can call them too. They see what `GET /wishes` sees: only the person's own wishes, never a list shared with them, never reservations. Addresses (`url`) are paths in the app.
+
+| Route | Scope | What |
+|---|---|---|
+| `GET /pocket/search?q&limit` | `pocket:search` | `{items}`: your wishes that have every word of `q` in the name, shop, notes, tags or who a gift is for. Wanted ones first, then bought, then archived; a name that has the words before the rest. Each has `id`, `title`, `snippet` (price · shop · list, starting with "Bought" or "Archived" when it is), `kind` `wish`, `date` (when it was added), `url` and `link` (the shop page). Words without a letter or digit find nothing. `limit` 1–50 (8) |
+| `GET /pocket/day/{date}?tz=` | `pocket:day` | `{date, summary, items, metrics}`: the wishes bought that day (`kind` `bought`, `amount` what was paid), the prices that ended the day somewhere else than they started it (`kind` `price`, `amount` the new price, `sub` "Shop · down from 129.00 EUR") and the wishes added (`kind` `added`, `amount` the price). `amount` is minor units of `currency`; `sub` is the shop, else the list. A wish shows once. The day is the one of `tz`, else the server's. `summary` is like "2 wishes added, 1 bought, 1 price drop" |
+| `GET /pocket/widget` | `pocket:widget` | `{line, metrics, items, url}`: the wishes at or below their target price first (most wanted first), then the ones added last, at most 8, with `detail` "95.50 EUR, was 129.00 EUR · Shop". `line` is "2 price drops", else "14 wishes"; `metrics` are Wishes, Price drops and Total (what `/dashboard` calls `value_text`). No shop page is read. Nothing wanted: empty |
+| `POST /pocket/capture` | `pocket:capture` | `{request_id, kind: "wish", title, text}` adds a wish to your first wishlist (made when missing) and answers `201 {id, title, url}`. The name is `title`, else the first line of `text`; more lines become the notes. The first web address in the line becomes the wish's link and is taken out of the name: the page is read as `POST /wishes` reads it (name, price, shop, stock; the price is then watched), for at most 8 seconds, and the picture is copied after the answer. A link alone is enough; when its page cannot be read the answer is `400` asking for a name in front of the link. The same `request_id` again answers the same wish and adds nothing; with other words it answers `400` |
+
 ## Events (Pocket Core bus)
 
 `wishlist.wish_added`, `wishlist.price_dropped` (`was`, `target`, `why`: `target|drop`), `wishlist.back_in_stock`, `wishlist.better_deal` (a repeat hunt found it clearly cheaper), `wishlist.bought` (`price`, `currency`, `date`, `store`, `gift_for`), `wishlist.reserved` — carrying the **giver's** `user_email`, never the list owner's, so a journal does not spoil the surprise.

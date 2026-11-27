@@ -28,6 +28,7 @@ var Version = "dev"
 type Server struct {
 	actionMu sync.Mutex
 	checkMu  sync.Mutex // one price sweep at a time
+	keepMu   sync.Mutex // one quick line at a time is written down (capabilities.go)
 	cfg      *config.Config
 	store    *store.Store
 	log      *slog.Logger
@@ -240,10 +241,12 @@ func (s *Server) registerWithCore(ctx context.Context) error {
 		Description: "Wishlists and gift ideas: say what you want and AI finds the best deal, or paste a shop link; prices are watched, lists shared so people can reserve gifts, and purchases filed in Inventory, Money and Split.",
 		Icon:        "/favicon.svg", Version: Version,
 		URL: s.cfg.CoreAppURL, PublicURL: s.cfg.BaseURL, HealthPath: "/healthz", EnvPrefix: "WISHLIST",
-		Publishes: eventTopics,
-		Offers:    linkOffers,
-		Portable:  portable,
-		Uses:      append(linkUses(), core.InferenceUse()),
+		Category:     "Home",
+		Publishes:    eventTopics,
+		Offers:       linkOffers,
+		Portable:     portable,
+		Capabilities: capabilities,
+		Uses:         append(linkUses(), core.InferenceUse()),
 	}
 	if s.cfg.BaseURL != "" {
 		// ask Core for a relying-party client so "Sign in with Pocket Core" needs no configuration

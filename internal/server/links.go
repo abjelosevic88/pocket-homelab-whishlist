@@ -14,10 +14,10 @@ import (
 // Pocket Core app links (docs/links.md in pocket-homelab-core), Wishlist as
 // the target: another Pocket app the person allowed in Core may act here for
 // them with a pcx_ token, only within these scopes. Every route not listed in
-// linkRoutes stays closed to it (403). A link sees exactly the person's own
-// lists (never lists shared with them, never who reserved what); a wish it
-// adds carries the app's slug as source, and it may change or delete only
-// those.
+// linkRoutes, portable or capabilities stays closed to it (403). A link sees
+// exactly the person's own lists (never lists shared with them, never who
+// reserved what); a wish it adds carries the app's slug as source, and it may
+// change or delete only those.
 
 var linkOffers = []core.Offer{
 	{Scope: "wishes:read", Name: "See your wishlists", Description: "Read your lists and wishes (titles, prices, price drops, what you bought) and upcoming gift occasions, for your journal, calendar and dashboards. Never who reserved a gift for you."},
@@ -33,6 +33,18 @@ var portable = &core.Portable{
 	Imports: []core.PortableImport{
 		{Path: "/api/v1/import", Kind: core.KindPocket, ContentType: "application/json", MaxBytes: 32 << 20, Title: "Adds the lists and wishes from another box; lists with the same name are merged and wishes you already have are skipped"},
 	},
+}
+
+// capabilities are what Pocket Search, Pocket Day and Pocket Hub may ask
+// Wishlist (docs/capabilities.md in pocket-homelab-core); Register adds the
+// pocket:* offers. The routes are in capabilities.go.
+var capabilities = core.Capabilities{
+	Search: &core.Searchable{What: "Your wishes and gift ideas, by name, shop and notes", Kinds: []string{"wish"}, Bangs: []string{"wish", "wishlist"}},
+	Day: &core.DayFeed{Label: "Wishlist", One: "wish", Many: "wishes", Unit: "count",
+		What: "The wishes you added or bought that day and the prices that changed"},
+	Widget: &core.Widget{Title: "Wishlist", What: "Wishes that reached your target price, then the ones you added last"},
+	Capture: &core.QuickCapture{Kinds: []core.CaptureKind{{Kind: "wish", Label: "Wish",
+		What: "A new wish on your wishlist; a shop link is read for the name, picture and price", Fields: []string{"title"}}}},
 }
 
 type linkRoute struct {
@@ -59,7 +71,7 @@ var errLinkScope = errors.New("outside the link's scope")
 
 // linkAllows reports whether a link token with these scopes may make this request.
 func linkAllows(scopes []string, r *http.Request) bool {
-	if portable.LinkAllows(scopes, r) {
+	if portable.LinkAllows(scopes, r) || capabilities.LinkAllows(scopes, r) {
 		return true
 	}
 	for _, lr := range linkRoutes {
